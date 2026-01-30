@@ -129,7 +129,7 @@ return [
         'default' => [
             'transport' => 'default',
             'from' => [
-                env('EMAIL_FROM_ADDRESS', 'noreply@example.com') => env('EMAIL_FROM_NAME', 'MyApp'),
+                env('EMAIL_FROM_ADDRESS', 'noreply@example.com') => env('EMAIL_FROM_NAME', 'Scorepile'),
             ],
             'charset' => 'utf-8',
             'headerCharset' => 'utf-8',

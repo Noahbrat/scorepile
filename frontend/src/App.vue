@@ -7,7 +7,7 @@
                 <button class="hamburger-btn" @click="toggleSidebar">
                     <i class="pi pi-bars"></i>
                 </button>
-                <div class="mobile-brand">MyApp</div>
+                <div class="mobile-brand">Scorepile</div>
             </header>
 
             <!-- Sidebar Navigation -->
@@ -15,7 +15,7 @@
                 <div class="sidebar-header">
                     <RouterLink to="/" class="brand-link" @click="closeSidebar">
                         <i class="pi pi-box"></i>
-                        <span>MyApp</span>
+                        <span>Scorepile</span>
                     </RouterLink>
                 </div>
 

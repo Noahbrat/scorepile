@@ -3,7 +3,7 @@
         <template #start>
             <RouterLink to="/" class="flex items-center gap-2 font-bold text-lg mr-4">
                 <i class="pi pi-box text-primary"></i>
-                <span>MyApp</span>
+                <span>Scorepile</span>
             </RouterLink>
         </template>
 
