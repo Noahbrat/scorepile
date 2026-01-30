@@ -1,0 +1,83 @@
+# Monorepo - Root Level #
+#########################
+node_modules/
+pnpm-lock.yaml
+*.log
+.env
+
+# API (CakePHP) specific files #
+################################
+/api/config/app_local.php
+/api/config/.env
+/api/logs/*
+/api/tmp/*
+/api/vendor/*
+/api/tests.sqlite
+/api/phpunit.xml.dist.bak
+/api/dump.rdb
+
+# CakePHP migrations lock files
+/api/config/Migrations/schema-dump-*.lock
+
+# Frontend (Vue) specific files #
+##################################
+/frontend/node_modules/*
+/frontend/dist/*
+/frontend/.vite/*
+/frontend/.env.local
+/frontend/.env.production.local
+/frontend/.env.development.local
+
+# Built frontend assets (deployed to API webroot)
+/api/webroot/app/
+
+# Shared package files #
+########################
+/shared/node_modules/*
+/shared/dist/*
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon
+
+ehthumbs.db
+Thumbs.db
+.directory
+
+# Tool specific files #
+#######################
+# PHPUnit
+.phpunit.result.cache
+.phpunit.cache/
+tests.sqlite
+# vim
+*~
+*.swp
+*.swo
+# sublime text & textmate
+*.sublime-*
+*.stTheme.cache
+*.tmlanguage.cache
+*.tmPreferences.cache
+# Eclipse
+.settings/*
+# JetBrains, aka PHPStorm, IntelliJ IDEA
+.idea/*
+# NetBeans
+nbproject/*
+# Visual Studio Code
+.vscode
+# nova
+.nova
+# Sass preprocessor
+.sass-cache/
+# TypeScript
+*.tsbuildinfo
+# yarn
+yarn-debug.log
+yarn-error.log

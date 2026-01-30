@@ -1,0 +1,35 @@
+{
+  "name": "cakevue-starter",
+  "version": "1.0.0",
+  "description": "CakePHP 5 + Vue 3 + TypeScript Full-Stack Starter Template",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"yarn dev:api\" \"yarn dev:frontend\"",
+    "dev:api": "cd api && bin/cake server -p 8765",
+    "dev:frontend": "cd frontend && yarn dev",
+    "build": "cd frontend && yarn build",
+    "build:frontend": "cd frontend && yarn build",
+    "test": "concurrently \"yarn test:api\" \"yarn test:frontend\"",
+    "test:api": "cd api && composer test",
+    "test:frontend": "cd frontend && yarn test",
+    "lint": "cd frontend && yarn lint",
+    "type-check": "cd frontend && yarn type-check",
+    "clean": "cd frontend && yarn clean",
+    "ci-check": "yarn ci-check:backend && yarn ci-check:frontend",
+    "ci-check:backend": "cd api && composer ci-check",
+    "ci-check:frontend": "cd frontend && yarn type-check && yarn lint:check && yarn test --run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0",
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "yarn": ">=1.22.0"
+  }
+}
