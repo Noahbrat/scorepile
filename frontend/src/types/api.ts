@@ -82,17 +82,119 @@ export interface ProfileResponse {
 }
 
 // =====================================================
-// Example Resource: Item
+// Player
 // =====================================================
 
-export interface Item {
+export interface Player {
     id: number;
     user_id: string;
-    title: string;
-    description?: string;
-    status: "active" | "archived" | "draft";
+    name: string;
+    color?: string;
+    avatar_emoji?: string;
     created?: string;
     modified?: string;
 }
 
-export type ItemInput = Omit<Item, "id" | "user_id" | "created" | "modified">;
+export type PlayerInput = Omit<Player, "id" | "user_id" | "created" | "modified">;
+
+// =====================================================
+// Game Type
+// =====================================================
+
+export interface GameType {
+    id: number;
+    user_id: string;
+    name: string;
+    description?: string;
+    scoring_direction: "high_wins" | "low_wins";
+    default_rounds?: number;
+    created?: string;
+    modified?: string;
+}
+
+export type GameTypeInput = Omit<GameType, "id" | "user_id" | "created" | "modified">;
+
+// =====================================================
+// Game
+// =====================================================
+
+export interface Game {
+    id: number;
+    user_id: string;
+    game_type_id?: number;
+    name: string;
+    status: "active" | "completed" | "abandoned";
+    notes?: string;
+    completed_at?: string;
+    created?: string;
+    modified?: string;
+    game_type?: GameType;
+    game_players?: GamePlayer[];
+    rounds?: Round[];
+}
+
+export interface GameInput {
+    name: string;
+    game_type_id?: number | null;
+    notes?: string;
+    player_ids?: number[];
+}
+
+// =====================================================
+// Game Player (join table)
+// =====================================================
+
+export interface GamePlayer {
+    id: number;
+    game_id: number;
+    player_id: number;
+    final_rank?: number;
+    total_score: number;
+    is_winner: boolean;
+    created?: string;
+    modified?: string;
+    player?: Player;
+    scores?: Score[];
+}
+
+// =====================================================
+// Round
+// =====================================================
+
+export interface Round {
+    id: number;
+    game_id: number;
+    round_number: number;
+    name?: string;
+    created?: string;
+    modified?: string;
+    scores?: Score[];
+}
+
+export interface RoundInput {
+    game_id: number;
+    round_number?: number;
+    name?: string;
+}
+
+// =====================================================
+// Score
+// =====================================================
+
+export interface Score {
+    id: number;
+    round_id: number;
+    game_player_id: number;
+    points: number;
+    notes?: string;
+    created?: string;
+    modified?: string;
+    game_player?: GamePlayer;
+}
+
+export interface ScoreInput {
+    round_id: number;
+    game_player_id: number;
+    points: number;
+    notes?: string;
+}

@@ -13,9 +13,27 @@ const router = createRouter({
             meta: { requiresAuth: true },
         },
         {
-            path: "/items",
-            name: "items",
-            component: () => import("../views/ItemsView.vue"),
+            path: "/games",
+            name: "games",
+            component: () => import("../views/GamesView.vue"),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: "/games/:id",
+            name: "game",
+            component: () => import("../views/GameView.vue"),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: "/players",
+            name: "players",
+            component: () => import("../views/PlayersView.vue"),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: "/game-types",
+            name: "game-types",
+            component: () => import("../views/GameTypesView.vue"),
             meta: { requiresAuth: true },
         },
         {
@@ -30,13 +48,6 @@ const router = createRouter({
             component: () => import("../views/RegisterView.vue"),
             meta: { requiresGuest: true },
         },
-        // ─── Add your own routes here ───────────────────────────
-        // {
-        //   path: '/your-resource',
-        //   name: 'your-resource',
-        //   component: () => import('../views/YourResourceView.vue'),
-        //   meta: { requiresAuth: true },
-        // },
     ],
 });
 

@@ -10,8 +10,16 @@ import {
 import type {
     ApiResponse,
     PaginatedApiResponse,
-    Item,
-    ItemInput,
+    Player,
+    PlayerInput,
+    GameType,
+    GameTypeInput,
+    Game,
+    GameInput,
+    Round,
+    RoundInput,
+    Score,
+    ScoreInput,
     LoginRequest,
     LoginResponse,
     RegisterRequest,
@@ -198,10 +206,10 @@ export const authApi = {
 };
 
 // =====================================================
-// Items CRUD API  (example resource)
+// Players CRUD API
 // =====================================================
 
-export const itemsApi = {
+export const playersApi = {
     getAll: (
         page: number = 1,
         limit: number = 20,
@@ -216,20 +224,140 @@ export const itemsApi = {
         if (sort) params.append("sort", sort);
         if (direction) params.append("direction", direction);
         if (search) params.append("search", search);
-        return api.get<PaginatedApiResponse<Item[]>>(`/items.json?${params}`);
+        return api.get<PaginatedApiResponse<Player[]>>(`/players.json?${params}`);
     },
 
     getById: (id: number) =>
-        api.get<ApiResponse<Item>>(`/items/${id}.json`),
+        api.get<ApiResponse<Player>>(`/players/${id}.json`),
 
-    create: (data: ItemInput) =>
-        api.post<ApiResponse<Item>>("/items.json", data),
+    create: (data: PlayerInput) =>
+        api.post<ApiResponse<Player>>("/players.json", data),
 
-    update: (id: number, data: Partial<ItemInput>) =>
-        api.put<ApiResponse<Item>>(`/items/${id}.json`, data),
+    update: (id: number, data: Partial<PlayerInput>) =>
+        api.put<ApiResponse<Player>>(`/players/${id}.json`, data),
 
     delete: (id: number) =>
-        api.delete<ApiResponse<null>>(`/items/${id}.json`),
+        api.delete<ApiResponse<null>>(`/players/${id}.json`),
+};
+
+// =====================================================
+// Game Types CRUD API
+// =====================================================
+
+export const gameTypesApi = {
+    getAll: (
+        page: number = 1,
+        limit: number = 20,
+        sort?: string,
+        direction?: "asc" | "desc",
+        search?: string,
+    ) => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+        });
+        if (sort) params.append("sort", sort);
+        if (direction) params.append("direction", direction);
+        if (search) params.append("search", search);
+        return api.get<PaginatedApiResponse<GameType[]>>(`/game-types.json?${params}`);
+    },
+
+    getById: (id: number) =>
+        api.get<ApiResponse<GameType>>(`/game-types/${id}.json`),
+
+    create: (data: GameTypeInput) =>
+        api.post<ApiResponse<GameType>>("/game-types.json", data),
+
+    update: (id: number, data: Partial<GameTypeInput>) =>
+        api.put<ApiResponse<GameType>>(`/game-types/${id}.json`, data),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse<null>>(`/game-types/${id}.json`),
+};
+
+// =====================================================
+// Games CRUD API
+// =====================================================
+
+export const gamesApi = {
+    getAll: (
+        page: number = 1,
+        limit: number = 20,
+        sort?: string,
+        direction?: "asc" | "desc",
+        search?: string,
+        status?: string,
+    ) => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+        });
+        if (sort) params.append("sort", sort);
+        if (direction) params.append("direction", direction);
+        if (search) params.append("search", search);
+        if (status) params.append("status", status);
+        return api.get<PaginatedApiResponse<Game[]>>(`/games.json?${params}`);
+    },
+
+    getById: (id: number) =>
+        api.get<ApiResponse<Game>>(`/games/${id}.json`),
+
+    create: (data: GameInput) =>
+        api.post<ApiResponse<Game>>("/games.json", data),
+
+    update: (id: number, data: Partial<GameInput>) =>
+        api.put<ApiResponse<Game>>(`/games/${id}.json`, data),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse<null>>(`/games/${id}.json`),
+
+    complete: (id: number) =>
+        api.post<ApiResponse<Game>>(`/games/${id}/complete.json`),
+};
+
+// =====================================================
+// Rounds CRUD API
+// =====================================================
+
+export const roundsApi = {
+    getAll: (gameId: number) =>
+        api.get<ApiResponse<Round[]>>(`/rounds.json?game_id=${gameId}`),
+
+    getById: (id: number) =>
+        api.get<ApiResponse<Round>>(`/rounds/${id}.json`),
+
+    create: (data: RoundInput) =>
+        api.post<ApiResponse<Round>>("/rounds.json", data),
+
+    update: (id: number, data: Partial<RoundInput>) =>
+        api.put<ApiResponse<Round>>(`/rounds/${id}.json`, data),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse<null>>(`/rounds/${id}.json`),
+};
+
+// =====================================================
+// Scores CRUD API
+// =====================================================
+
+export const scoresApi = {
+    getAll: (roundId: number) =>
+        api.get<ApiResponse<Score[]>>(`/scores.json?round_id=${roundId}`),
+
+    getById: (id: number) =>
+        api.get<ApiResponse<Score>>(`/scores/${id}.json`),
+
+    create: (data: ScoreInput) =>
+        api.post<ApiResponse<Score>>("/scores.json", data),
+
+    bulkAdd: (scores: ScoreInput[]) =>
+        api.post<ApiResponse<Score[]>>("/scores.json", { scores }),
+
+    update: (id: number, data: Partial<ScoreInput>) =>
+        api.put<ApiResponse<Score>>(`/scores/${id}.json`, data),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse<null>>(`/scores/${id}.json`),
 };
 
 export default api;

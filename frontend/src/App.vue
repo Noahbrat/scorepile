@@ -33,22 +33,32 @@
                         </li>
                         <li class="nav-item">
                             <RouterLink
-                                to="/items"
+                                to="/games"
                                 class="nav-link"
                                 @click="closeSidebar"
                             >
-                                <i class="pi pi-list"></i>
-                                <span>Items</span>
+                                <i class="pi pi-play"></i>
+                                <span>Games</span>
                             </RouterLink>
                         </li>
                         <li class="nav-item">
                             <RouterLink
-                                to="/settings"
+                                to="/players"
+                                class="nav-link"
+                                @click="closeSidebar"
+                            >
+                                <i class="pi pi-users"></i>
+                                <span>Players</span>
+                            </RouterLink>
+                        </li>
+                        <li class="nav-item">
+                            <RouterLink
+                                to="/game-types"
                                 class="nav-link"
                                 @click="closeSidebar"
                             >
                                 <i class="pi pi-cog"></i>
-                                <span>Settings</span>
+                                <span>Game Types</span>
                             </RouterLink>
                         </li>
                     </ul>
