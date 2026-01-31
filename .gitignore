@@ -49,6 +49,9 @@ ehthumbs.db
 Thumbs.db
 .directory
 
+# Claude Code
+.claude/settings.local.json
+
 # Tool specific files #
 #######################
 # PHPUnit
