@@ -9,14 +9,11 @@ use Cake\Event\EventInterface;
 use Cake\View\JsonView;
 
 /**
- * Items Controller
+ * GameTypes Controller
  *
- * Example CRUD resource controller demonstrating the pattern.
- * Copy this controller and adapt it for your own resources.
- *
- * @property \App\Model\Table\ItemsTable $Items
+ * @property \App\Model\Table\GameTypesTable $GameTypes
  */
-class ItemsController extends AppController
+class GameTypesController extends AppController
 {
     use JwtAuthTrait;
     use CrudErrorSerializationTrait;
@@ -32,7 +29,6 @@ class ItemsController extends AppController
 
         $this->loadComponent('Authentication.Authentication');
 
-        // Load CRUD plugin for automatic RESTful actions
         $this->loadComponent('Crud.Crud', [
             'actions' => [
                 'Crud.Index',
@@ -54,57 +50,52 @@ class ItemsController extends AppController
     {
         parent::beforeFilter($event);
 
-        // Allow unauthenticated access to read operations
-        $this->Authentication->addUnauthenticatedActions(['index', 'view']);
+        $this->Authentication->addUnauthenticatedActions([]);
     }
 
     /**
-     * Index method — list items for authenticated user
+     * Index method — list game types for authenticated user
      *
-     * GET /api/items.json
+     * GET /api/game-types.json
      */
     public function index(): void
     {
-        // Optional: scope items to authenticated user
-        $user = $this->getAuthenticatedUser();
+        $user = $this->requireAuthentication();
 
-        $query = $this->Items->find();
-
-        if ($user) {
-            $query->where(['Items.user_id' => $user->id]);
-        }
+        $query = $this->GameTypes->find()
+            ->where(['GameTypes.user_id' => $user->id]);
 
         // Pagination
         $page = (int)($this->request->getQuery('page') ?? 1);
         $limit = min((int)($this->request->getQuery('limit') ?? 20), 100);
 
         // Sorting
-        $sort = $this->request->getQuery('sort', 'modified');
-        $direction = $this->request->getQuery('direction', 'desc');
-        $allowedSortFields = ['title', 'created', 'modified', 'status'];
+        $sort = $this->request->getQuery('sort', 'name');
+        $direction = $this->request->getQuery('direction', 'asc');
+        $allowedSortFields = ['name', 'scoring_direction', 'created', 'modified'];
         if (!in_array($sort, $allowedSortFields)) {
-            $sort = 'modified';
+            $sort = 'name';
         }
-        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? $direction : 'desc';
-        $query->orderBy(["Items.{$sort}" => $direction]);
+        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? $direction : 'asc';
+        $query->orderBy(["GameTypes.{$sort}" => $direction]);
 
         // Search
         $search = $this->request->getQuery('search');
         if ($search) {
             $query->where([
                 'OR' => [
-                    'Items.title LIKE' => "%{$search}%",
-                    'Items.description LIKE' => "%{$search}%",
+                    'GameTypes.name LIKE' => "%{$search}%",
+                    'GameTypes.description LIKE' => "%{$search}%",
                 ],
             ]);
         }
 
         $total = $query->count();
-        $items = $query->limit($limit)->offset(($page - 1) * $limit)->all();
+        $gameTypes = $query->limit($limit)->offset(($page - 1) * $limit)->all();
 
         $this->set([
             'success' => true,
-            'data' => $items,
+            'data' => $gameTypes,
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
@@ -116,130 +107,141 @@ class ItemsController extends AppController
     }
 
     /**
-     * View method — get single item
+     * View method — get single game type
      *
-     * GET /api/items/:id.json
+     * GET /api/game-types/:id.json
      */
     public function view(?string $id = null): void
     {
-        $item = $this->Items->get($id);
+        $user = $this->requireAuthentication();
+
+        $gameType = $this->GameTypes->get($id);
+
+        if ($gameType->user_id !== $user->id) {
+            $this->response = $this->response->withStatus(403);
+            $this->set([
+                'success' => false,
+                'message' => 'Not authorized to view this game type',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
 
         $this->set([
             'success' => true,
-            'data' => $item,
+            'data' => $gameType,
         ]);
         $this->viewBuilder()->setOption('serialize', ['success', 'data']);
     }
 
     /**
-     * Add method — create new item (requires auth)
+     * Add method — create new game type
      *
-     * POST /api/items.json
+     * POST /api/game-types.json
      */
     public function add(): void
     {
         $this->request->allowMethod(['post']);
         $user = $this->requireAuthentication();
 
-        $item = $this->Items->newEmptyEntity();
+        $gameType = $this->GameTypes->newEmptyEntity();
         $data = $this->request->getData();
         $data['user_id'] = $user->id;
 
-        $item = $this->Items->patchEntity($item, $data);
+        $gameType = $this->GameTypes->patchEntity($gameType, $data);
 
-        if ($this->Items->save($item)) {
+        if ($this->GameTypes->save($gameType)) {
             $this->response = $this->response->withStatus(201);
             $this->set([
                 'success' => true,
-                'data' => $item,
+                'data' => $gameType,
             ]);
         } else {
             $this->response = $this->response->withStatus(422);
             $this->set([
                 'success' => false,
-                'message' => 'Could not save item',
-                'errors' => $item->getErrors(),
+                'message' => 'Could not save game type',
+                'errors' => $gameType->getErrors(),
             ]);
         }
         $this->viewBuilder()->setOption('serialize', ['success', 'data', 'message', 'errors']);
     }
 
     /**
-     * Edit method — update existing item (requires auth + ownership)
+     * Edit method — update existing game type
      *
-     * PUT /api/items/:id.json
+     * PUT /api/game-types/:id.json
      */
     public function edit(?string $id = null): void
     {
         $this->request->allowMethod(['put', 'patch']);
         $user = $this->requireAuthentication();
 
-        $item = $this->Items->get($id);
+        $gameType = $this->GameTypes->get($id);
 
-        // Verify ownership
-        if ($item->user_id !== $user->id && !$user->isAdmin()) {
+        if ($gameType->user_id !== $user->id) {
             $this->response = $this->response->withStatus(403);
             $this->set([
                 'success' => false,
-                'message' => 'Not authorized to edit this item',
+                'message' => 'Not authorized to edit this game type',
             ]);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
 
             return;
         }
 
-        $item = $this->Items->patchEntity($item, $this->request->getData());
+        $gameType = $this->GameTypes->patchEntity($gameType, $this->request->getData());
 
-        if ($this->Items->save($item)) {
+        if ($this->GameTypes->save($gameType)) {
             $this->set([
                 'success' => true,
-                'data' => $item,
+                'data' => $gameType,
             ]);
         } else {
             $this->response = $this->response->withStatus(422);
             $this->set([
                 'success' => false,
-                'message' => 'Could not update item',
-                'errors' => $item->getErrors(),
+                'message' => 'Could not update game type',
+                'errors' => $gameType->getErrors(),
             ]);
         }
         $this->viewBuilder()->setOption('serialize', ['success', 'data', 'message', 'errors']);
     }
 
     /**
-     * Delete method — remove item (requires auth + ownership)
+     * Delete method — remove game type
      *
-     * DELETE /api/items/:id.json
+     * DELETE /api/game-types/:id.json
      */
     public function delete(?string $id = null): void
     {
         $this->request->allowMethod(['delete']);
         $user = $this->requireAuthentication();
 
-        $item = $this->Items->get($id);
+        $gameType = $this->GameTypes->get($id);
 
-        // Verify ownership
-        if ($item->user_id !== $user->id && !$user->isAdmin()) {
+        if ($gameType->user_id !== $user->id) {
             $this->response = $this->response->withStatus(403);
             $this->set([
                 'success' => false,
-                'message' => 'Not authorized to delete this item',
+                'message' => 'Not authorized to delete this game type',
             ]);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
 
             return;
         }
 
-        if ($this->Items->delete($item)) {
+        if ($this->GameTypes->delete($gameType)) {
             $this->set([
                 'success' => true,
-                'message' => 'Item deleted',
+                'message' => 'Game type deleted',
             ]);
         } else {
             $this->response = $this->response->withStatus(500);
             $this->set([
                 'success' => false,
-                'message' => 'Could not delete item',
+                'message' => 'Could not delete game type',
             ]);
         }
         $this->viewBuilder()->setOption('serialize', ['success', 'message']);

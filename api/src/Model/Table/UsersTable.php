@@ -25,8 +25,17 @@ class UsersTable extends Table
 
         $this->addBehavior('Timestamp');
 
-        // Add relationships to your models here:
-        // $this->hasMany('Items', ['foreignKey' => 'user_id']);
+        $this->hasMany('Games', [
+            'foreignKey' => 'user_id',
+        ]);
+
+        $this->hasMany('GameTypes', [
+            'foreignKey' => 'user_id',
+        ]);
+
+        $this->hasMany('Players', [
+            'foreignKey' => 'user_id',
+        ]);
     }
 
     public function validationDefault(Validator $validator): Validator
