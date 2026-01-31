@@ -19,13 +19,6 @@ return static function (RouteBuilder $routes) {
     $routes->prefix('api', function (RouteBuilder $routes) {
 
         // =====================================================
-        // Example CRUD Resource: Items
-        // =====================================================
-        $routes->resources('Items', [
-            'controller' => 'Api/Items',
-        ]);
-
-        // =====================================================
         // Authentication Routes
         // =====================================================
         $routes->resources('Users', [
@@ -95,11 +88,34 @@ return static function (RouteBuilder $routes) {
         ], ['_method' => ['POST']]);
 
         // =====================================================
-        // Add your own resource routes here:
+        // Game Scoring Resources
         // =====================================================
-        // $routes->resources('YourResource', [
-        //     'controller' => 'Api/YourResource',
-        // ]);
+        $routes->resources('Games', [
+            'controller' => 'Api/Games',
+        ]);
+
+        // Custom game action: complete a game
+        $routes->connect('/games/:id/complete', [
+            'controller' => 'Games',
+            'action' => 'complete',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id']]);
+
+        $routes->resources('GameTypes', [
+            'controller' => 'Api/GameTypes',
+        ]);
+
+        $routes->resources('Players', [
+            'controller' => 'Api/Players',
+        ]);
+
+        $routes->resources('Rounds', [
+            'controller' => 'Api/Rounds',
+        ]);
+
+        $routes->resources('Scores', [
+            'controller' => 'Api/Scores',
+        ]);
     });
 
     // No traditional web routes — this is an API-only backend.
