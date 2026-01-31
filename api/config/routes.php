@@ -95,7 +95,7 @@ return static function (RouteBuilder $routes) {
         ]);
 
         // Custom game action: complete a game
-        $routes->connect('/games/:id/complete', [
+        $routes->connect('/games/{id}/complete', [
             'controller' => 'Games',
             'action' => 'complete',
             'prefix' => 'Api',

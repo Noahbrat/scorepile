@@ -64,9 +64,25 @@ trait JwtAuthTrait
         if ($this->components()->has('Authentication')) {
             $identity = $this->Authentication->getIdentity();
             if ($identity) {
-                assert($identity instanceof User);
+                if ($identity instanceof User) {
+                    return $identity;
+                }
 
-                return $identity;
+                // JWT authenticator with returnPayload returns the decoded token payload.
+                // Extract the user ID and load the full User entity.
+                $data = $identity->getOriginalData();
+                $sub = $data->sub ?? ($data['sub'] ?? null);
+                if ($sub) {
+                    try {
+                        $usersTable = $this->getTableLocator()->get('Users');
+                        $user = $usersTable->get($sub);
+                        assert($user instanceof User);
+
+                        return $user;
+                    } catch (\Exception $e) {
+                        return null;
+                    }
+                }
             }
         }
 

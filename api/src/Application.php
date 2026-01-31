@@ -125,7 +125,7 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
 
         // JWT authenticator for API access
         $authenticationService->loadAuthenticator('Authentication.Jwt', [
-            'secret' => Configure::read('Security.jwtSecret'),
+            'secretKey' => Configure::read('Security.jwtSecret'),
             'algorithm' => 'HS256',
             'returnPayload' => true,
             'identifier' => $passwordIdentifier,

@@ -176,7 +176,7 @@ class RoundsController extends AppController
                 ->where(['game_id' => $data['game_id']])
                 ->select(['max_round' => $this->Rounds->find()->func()->max('round_number')])
                 ->first();
-            $data['round_number'] = ($maxRound->max_round ?? 0) + 1;
+            $data['round_number'] = (int)(($maxRound->max_round ?? 0) + 1);
         }
 
         $round = $this->Rounds->newEmptyEntity();
