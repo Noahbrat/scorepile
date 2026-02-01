@@ -161,9 +161,41 @@ class GamesController extends AppController
         $data = $this->request->getData();
         $data['user_id'] = $user->id;
 
+        // Extract player_ids before patching (not a direct entity field)
+        $playerIds = $data['player_ids'] ?? [];
+        unset($data['player_ids']);
+
         $game = $this->Games->patchEntity($game, $data);
 
         if ($this->Games->save($game)) {
+            // Create game_players for each selected player
+            if (!empty($playerIds)) {
+                $gamePlayersTable = $this->getTableLocator()->get('GamePlayers');
+                $playersTable = $this->getTableLocator()->get('Players');
+
+                foreach ($playerIds as $playerId) {
+                    // Verify player belongs to this user
+                    try {
+                        $player = $playersTable->get($playerId);
+                        if ($player->user_id !== $user->id) {
+                            continue;
+                        }
+                    } catch (\Exception $e) {
+                        continue;
+                    }
+
+                    $gamePlayer = $gamePlayersTable->newEntity([
+                        'game_id' => $game->id,
+                        'player_id' => (int)$playerId,
+                        'total_score' => 0,
+                    ]);
+                    $gamePlayersTable->save($gamePlayer);
+                }
+
+                // Reload game with players for response
+                $game = $this->Games->get($game->id, contain: ['GamePlayers' => ['Players'], 'GameTypes']);
+            }
+
             $this->response = $this->response->withStatus(201);
             $this->set([
                 'success' => true,

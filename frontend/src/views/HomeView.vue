@@ -8,23 +8,35 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Items Summary Card -->
+            <!-- Games Card -->
             <Card>
                 <template #content>
                     <div class="p-4">
                         <div class="flex items-center gap-4 mb-4">
                             <div class="bg-primary/10 text-primary rounded-full p-3">
-                                <i class="pi pi-list text-2xl"></i>
+                                <i class="pi pi-play text-2xl"></i>
                             </div>
                             <div>
-                                <h3 class="text-lg font-semibold">Items</h3>
-                                <p class="text-muted-color text-sm">Manage your items</p>
+                                <h3 class="text-lg font-semibold">Games</h3>
+                                <p class="text-muted-color text-sm">
+                                    {{ gamesStore.activeGames.length }} active
+                                </p>
+                            </div>
+                        </div>
+                        <div class="space-y-2 text-sm mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-muted-color">Total Games</span>
+                                <span class="font-semibold">{{ gamesStore.totalGames }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted-color">Active</span>
+                                <span class="font-semibold">{{ gamesStore.activeGames.length }}</span>
                             </div>
                         </div>
                         <Button
                             as="router-link"
-                            to="/items"
-                            label="View Items"
+                            to="/games"
+                            label="View Games"
                             icon="pi pi-arrow-right"
                             iconPos="right"
                             class="w-full"
@@ -33,23 +45,23 @@
                 </template>
             </Card>
 
-            <!-- Quick Stats Card -->
+            <!-- Players Card -->
             <Card>
                 <template #content>
                     <div class="p-4">
                         <div class="flex items-center gap-4 mb-4">
                             <div class="bg-green-500/10 text-green-500 rounded-full p-3">
-                                <i class="pi pi-chart-bar text-2xl"></i>
+                                <i class="pi pi-users text-2xl"></i>
                             </div>
                             <div>
-                                <h3 class="text-lg font-semibold">Quick Stats</h3>
-                                <p class="text-muted-color text-sm">At a glance</p>
+                                <h3 class="text-lg font-semibold">Players</h3>
+                                <p class="text-muted-color text-sm">Player pool</p>
                             </div>
                         </div>
-                        <div class="space-y-2 text-sm">
+                        <div class="space-y-2 text-sm mb-4">
                             <div class="flex justify-between">
-                                <span class="text-muted-color">Total Items</span>
-                                <span class="font-semibold">{{ itemsStore.totalItems }}</span>
+                                <span class="text-muted-color">Total Players</span>
+                                <span class="font-semibold">{{ playersStore.totalPlayers }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-muted-color">Account Status</span>
@@ -57,33 +69,38 @@
                                      :severity="authStore.user?.active ? 'success' : 'warn'" />
                             </div>
                         </div>
+                        <Button
+                            as="router-link"
+                            to="/players"
+                            label="Manage Players"
+                            icon="pi pi-arrow-right"
+                            iconPos="right"
+                            severity="secondary"
+                            class="w-full"
+                        />
                     </div>
                 </template>
             </Card>
 
-            <!-- Profile Card -->
+            <!-- Quick Action Card -->
             <Card>
                 <template #content>
                     <div class="p-4">
                         <div class="flex items-center gap-4 mb-4">
                             <div class="bg-blue-500/10 text-blue-500 rounded-full p-3">
-                                <i class="pi pi-user text-2xl"></i>
+                                <i class="pi pi-bolt text-2xl"></i>
                             </div>
                             <div>
-                                <h3 class="text-lg font-semibold">Profile</h3>
-                                <p class="text-muted-color text-sm">{{ authStore.user?.email }}</p>
+                                <h3 class="text-lg font-semibold">Quick Start</h3>
+                                <p class="text-muted-color text-sm">Jump right in</p>
                             </div>
                         </div>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-muted-color">Username</span>
-                                <span class="font-semibold">{{ authStore.user?.username }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-muted-color">Role</span>
-                                <Tag :value="authStore.user?.role || 'user'" />
-                            </div>
-                        </div>
+                        <Button
+                            label="New Game"
+                            icon="pi pi-plus"
+                            class="w-full"
+                            @click="router.push('/games')"
+                        />
                     </div>
                 </template>
             </Card>
@@ -93,19 +110,25 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { useRouter } from "vue-router";
 import Card from "primevue/card";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import { useAuthStore } from "@/stores/auth";
-import { useItemsStore } from "@/stores/items";
+import { useGamesStore } from "@/stores/games";
+import { usePlayersStore } from "@/stores/players";
 
+const router = useRouter();
 const authStore = useAuthStore();
-const itemsStore = useItemsStore();
+const gamesStore = useGamesStore();
+const playersStore = usePlayersStore();
 
 onMounted(async () => {
-    // Preload items count for the dashboard
     try {
-        await itemsStore.fetchItems(1, 1); // minimal fetch for count
+        await Promise.all([
+            gamesStore.fetchGames(1, 20),
+            playersStore.fetchPlayers(1, 1),
+        ]);
     } catch {
         // non-critical — just won't show stats
     }

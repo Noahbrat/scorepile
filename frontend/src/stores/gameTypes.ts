@@ -1,7 +1,7 @@
 import { ref, computed } from "vue";
 import { defineStore } from "pinia";
-import { itemsApi } from "@/services/api";
-import type { Item, ItemInput, ApiPagination } from "@/types/api";
+import { gameTypesApi } from "@/services/api";
+import type { GameType, GameTypeInput, ApiPagination } from "@/types/api";
 
 interface PaginationInfo {
     page: number;
@@ -10,29 +10,29 @@ interface PaginationInfo {
     totalPages: number;
 }
 
-export const useItemsStore = defineStore("items", () => {
+export const useGameTypesStore = defineStore("gameTypes", () => {
     // ── State ────────────────────────────────────────────────────
-    const items = ref<Item[]>([]);
-    const currentItem = ref<Item | null>(null);
+    const gameTypes = ref<GameType[]>([]);
+    const currentGameType = ref<GameType | null>(null);
     const loading = ref(false);
     const error = ref<string | null>(null);
     const pagination = ref<PaginationInfo>({
         page: 1,
-        limit: 20,
+        limit: 100,
         total: 0,
         totalPages: 0,
     });
     const searchQuery = ref("");
-    const sortField = ref<string | undefined>(undefined);
+    const sortField = ref<string | undefined>("name");
     const sortDirection = ref<"asc" | "desc">("asc");
 
     // ── Getters ──────────────────────────────────────────────────
-    const hasItems = computed(() => items.value.length > 0);
-    const totalItems = computed(() => pagination.value.total);
+    const hasGameTypes = computed(() => gameTypes.value.length > 0);
+    const totalGameTypes = computed(() => pagination.value.total);
 
     // ── Actions ──────────────────────────────────────────────────
 
-    async function fetchItems(page?: number, limit?: number) {
+    async function fetchGameTypes(page?: number, limit?: number) {
         loading.value = true;
         error.value = null;
 
@@ -40,7 +40,7 @@ export const useItemsStore = defineStore("items", () => {
             const p = page ?? pagination.value.page;
             const l = limit ?? pagination.value.limit;
 
-            const response = await itemsApi.getAll(
+            const response = await gameTypesApi.getAll(
                 p,
                 l,
                 sortField.value,
@@ -48,7 +48,7 @@ export const useItemsStore = defineStore("items", () => {
                 searchQuery.value || undefined,
             );
 
-            items.value = response.data.data;
+            gameTypes.value = response.data.data;
 
             if (response.data.pagination) {
                 const pg: ApiPagination = response.data.pagination;
@@ -60,86 +60,86 @@ export const useItemsStore = defineStore("items", () => {
                 };
             }
         } catch (err: unknown) {
-            error.value = extractError(err, "Failed to fetch items");
+            error.value = extractError(err, "Failed to fetch game types");
         } finally {
             loading.value = false;
         }
     }
 
-    async function fetchItem(id: number) {
+    async function fetchGameType(id: number) {
         loading.value = true;
         error.value = null;
 
         try {
-            const response = await itemsApi.getById(id);
-            currentItem.value = response.data.data;
+            const response = await gameTypesApi.getById(id);
+            currentGameType.value = response.data.data;
             return response.data.data;
         } catch (err: unknown) {
-            error.value = extractError(err, "Failed to fetch item");
+            error.value = extractError(err, "Failed to fetch game type");
             throw new Error(error.value);
         } finally {
             loading.value = false;
         }
     }
 
-    async function createItem(data: ItemInput) {
+    async function createGameType(data: GameTypeInput) {
         loading.value = true;
         error.value = null;
 
         try {
-            const response = await itemsApi.create(data);
-            const newItem = response.data.data;
-            items.value.unshift(newItem);
-            return newItem;
+            const response = await gameTypesApi.create(data);
+            const newGameType = response.data.data;
+            gameTypes.value.unshift(newGameType);
+            pagination.value.total++;
+            return newGameType;
         } catch (err: unknown) {
-            error.value = extractError(err, "Failed to create item");
+            error.value = extractError(err, "Failed to create game type");
             throw new Error(error.value);
         } finally {
             loading.value = false;
         }
     }
 
-    async function updateItem(id: number, data: Partial<ItemInput>) {
+    async function updateGameType(id: number, data: Partial<GameTypeInput>) {
         loading.value = true;
         error.value = null;
 
         try {
-            const response = await itemsApi.update(id, data);
+            const response = await gameTypesApi.update(id, data);
             const updated = response.data.data;
 
-            // Update in list
-            const index = items.value.findIndex((item) => item.id === id);
+            const index = gameTypes.value.findIndex((gt) => gt.id === id);
             if (index !== -1) {
-                items.value[index] = updated;
+                gameTypes.value[index] = updated;
             }
 
-            // Update current if viewing
-            if (currentItem.value?.id === id) {
-                currentItem.value = updated;
+            if (currentGameType.value?.id === id) {
+                currentGameType.value = updated;
             }
 
             return updated;
         } catch (err: unknown) {
-            error.value = extractError(err, "Failed to update item");
+            error.value = extractError(err, "Failed to update game type");
             throw new Error(error.value);
         } finally {
             loading.value = false;
         }
     }
 
-    async function deleteItem(id: number) {
+    async function deleteGameType(id: number) {
         loading.value = true;
         error.value = null;
 
         try {
-            await itemsApi.delete(id);
-            items.value = items.value.filter((item) => item.id !== id);
+            await gameTypesApi.delete(id);
+            gameTypes.value = gameTypes.value.filter((gt) => gt.id !== id);
+            pagination.value.total--;
 
-            if (currentItem.value?.id === id) {
-                currentItem.value = null;
+            if (currentGameType.value?.id === id) {
+                currentGameType.value = null;
             }
         } catch (err: unknown) {
-            error.value = extractError(err, "Failed to delete item");
+            error.value = extractError(err, "Failed to delete game type");
             throw new Error(error.value);
         } finally {
             loading.value = false;
@@ -172,8 +172,8 @@ export const useItemsStore = defineStore("items", () => {
 
     return {
         // State
-        items,
-        currentItem,
+        gameTypes,
+        currentGameType,
         loading,
         error,
         pagination,
@@ -181,14 +181,14 @@ export const useItemsStore = defineStore("items", () => {
         sortField,
         sortDirection,
         // Getters
-        hasItems,
-        totalItems,
+        hasGameTypes,
+        totalGameTypes,
         // Actions
-        fetchItems,
-        fetchItem,
-        createItem,
-        updateItem,
-        deleteItem,
+        fetchGameTypes,
+        fetchGameType,
+        createGameType,
+        updateGameType,
+        deleteGameType,
         setSearch,
         setSort,
         setPage,

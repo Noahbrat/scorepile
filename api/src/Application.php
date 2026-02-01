@@ -109,26 +109,24 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
     {
         $authenticationService = new AuthenticationService();
 
-        $passwordIdentifier = [
-            'Authentication.Password' => [
-                'fields' => [
-                    'username' => 'email',
-                    'password' => 'password',
-                ],
-                'resolver' => [
-                    'className' => 'Authentication.Orm',
-                    'userModel' => 'Users',
-                    'finder' => 'all',
-                ],
+        // Load the password identifier — required for both Form and JWT auth
+        $authenticationService->loadIdentifier('Authentication.Password', [
+            'fields' => [
+                'username' => 'email',
+                'password' => 'password',
             ],
-        ];
+            'resolver' => [
+                'className' => 'Authentication.Orm',
+                'userModel' => 'Users',
+                'finder' => 'all',
+            ],
+        ]);
 
         // JWT authenticator for API access
         $authenticationService->loadAuthenticator('Authentication.Jwt', [
             'secretKey' => Configure::read('Security.jwtSecret'),
             'algorithm' => 'HS256',
             'returnPayload' => true,
-            'identifier' => $passwordIdentifier,
         ]);
 
         // Form authenticator for login endpoint
@@ -141,7 +139,6 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
                 '/api/users/login',
                 '/api/users/jwt_login',
             ],
-            'identifier' => $passwordIdentifier,
         ]);
 
         return $authenticationService;
