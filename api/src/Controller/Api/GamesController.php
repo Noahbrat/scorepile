@@ -261,6 +261,78 @@ class GamesController extends AppController
     }
 
     /**
+     * Assign teams — update team assignments for game players
+     *
+     * POST /api/games/:id/assign-teams
+     * Body: { "teams": { "player_id": team_number, ... } }
+     */
+    public function assignTeams(?string $id = null): void
+    {
+        $this->request->allowMethod(['post']);
+        $user = $this->requireAuthentication();
+
+        $game = $this->Games->get($id, contain: ['GamePlayers.Players']);
+
+        if ($game->user_id !== $user->id) {
+            $this->response = $this->response->withStatus(403);
+            $this->set([
+                'success' => false,
+                'message' => 'Not authorized to edit this game',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        if ($game->status !== 'active') {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'Can only assign teams on active games',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        $teams = $this->request->getData('teams');
+
+        if (empty($teams) || !is_array($teams)) {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'teams is required as an object mapping player_id to team number',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        $gamePlayersTable = $this->fetchTable('GamePlayers');
+
+        foreach ($game->game_players as $gp) {
+            $playerId = (string) $gp->player_id;
+            if (isset($teams[$playerId])) {
+                $gp->team = (int) $teams[$playerId];
+                $gamePlayersTable->save($gp);
+            }
+        }
+
+        // Reload with fresh data
+        $game = $this->Games->get($id, contain: [
+            'GameTypes',
+            'GamePlayers' => ['sort' => ['GamePlayers.team' => 'ASC', 'GamePlayers.id' => 'ASC']],
+            'GamePlayers.Players',
+        ]);
+
+        $this->set([
+            'success' => true,
+            'data' => $game,
+        ]);
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+    }
+
+    /**
      * Delete method — remove game
      *
      * DELETE /api/games/:id.json

@@ -113,6 +113,12 @@ return static function (RouteBuilder $routes) {
             'prefix' => 'Api',
         ], ['_method' => ['POST'], 'pass' => ['id']]);
 
+        $routes->connect('/games/{id}/assign-teams', [
+            'controller' => 'Games',
+            'action' => 'assignTeams',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id']]);
+
         $routes->resources('GameTypes', [
             'controller' => 'Api/GameTypes',
         ]);

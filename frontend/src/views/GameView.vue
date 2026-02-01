@@ -78,8 +78,65 @@
                 </div>
             </div>
 
+            <!-- Team Assignment (for team games with unassigned players) -->
+            <div v-if="hasEngine && isTeamGame && needsTeamSetup" class="mb-6">
+                <div class="border border-surface-200 dark:border-surface-700 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-2">Set Up Teams</h3>
+                    <p class="text-muted-color text-sm mb-4">
+                        Assign players to teams before starting. Drag or tap to move players between teams.
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div
+                            v-for="teamNum in teamCount"
+                            :key="teamNum"
+                            class="border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg p-3 min-h-32"
+                            :class="{ 'border-primary': true }"
+                        >
+                            <div class="text-sm font-semibold mb-2 text-center">Team {{ teamNum }}</div>
+                            <div class="space-y-2">
+                                <div
+                                    v-for="gp in gamePlayers.filter(p => teamDraft[p.player_id] === teamNum)"
+                                    :key="gp.id"
+                                    class="flex items-center gap-2 p-2 rounded bg-surface-100 dark:bg-surface-800"
+                                >
+                                    <div
+                                        class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                                        :style="{ background: gp.player?.color || 'var(--p-primary-color)' }"
+                                    >
+                                        {{ gp.player?.avatar_emoji || gp.player?.name?.charAt(0).toUpperCase() }}
+                                    </div>
+                                    <span class="flex-1 font-medium text-sm">{{ gp.player?.name }}</span>
+                                    <Button
+                                        icon="pi pi-arrow-right-arrow-left"
+                                        severity="secondary"
+                                        text
+                                        rounded
+                                        size="small"
+                                        @click="cycleTeam(gp.player_id)"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <Button
+                            label="Save Teams"
+                            icon="pi pi-check"
+                            :loading="savingTeams"
+                            :disabled="!teamsValid"
+                            @click="saveTeams"
+                        />
+                    </div>
+                    <p v-if="!teamsValid" class="text-red-500 text-xs mt-2 text-right">
+                        Each team needs {{ scoringConfig?.teams?.size ?? 2 }} players
+                    </p>
+                </div>
+            </div>
+
             <!-- Engine Score Table (team-based, e.g., 500) -->
-            <template v-if="hasEngine && isTeamGame">
+            <template v-if="hasEngine && isTeamGame && !needsTeamSetup">
                 <!-- Team totals -->
                 <div class="flex gap-4 mb-4">
                     <div
@@ -316,6 +373,8 @@ const completing = ref(false);
 const completeDialogVisible = ref(false);
 const newRoundDialogVisible = ref(false);
 const savingRound = ref(false);
+const savingTeams = ref(false);
+const teamDraft = reactive<Record<number, number>>({});
 
 // Local score edits: key = `${roundId}-${gamePlayerId}`, value = points
 const scoreEdits = reactive<Record<string, number | null>>({});
@@ -333,6 +392,70 @@ const scoringConfig = computed<ScoringConfig | null>(() =>
 const hasEngine = computed(() => scoringConfig.value !== null && scoringConfig.value.engine !== "simple");
 
 const isTeamGame = computed(() => scoringConfig.value?.teams?.enabled ?? false);
+
+const teamCount = computed(() => {
+    if (!isTeamGame.value || !scoringConfig.value?.teams) return 0;
+    const teamSize = scoringConfig.value.teams.size ?? 2;
+    return Math.ceil(gamePlayers.value.length / teamSize);
+});
+
+const needsTeamSetup = computed(() => {
+    if (!isTeamGame.value) return false;
+    return gamePlayers.value.some(gp => gp.team === null || gp.team === undefined);
+});
+
+const teamsValid = computed(() => {
+    if (!isTeamGame.value || !scoringConfig.value?.teams) return false;
+    const teamSize = scoringConfig.value.teams.size ?? 2;
+    const counts: Record<number, number> = {};
+    for (const gp of gamePlayers.value) {
+        const t = teamDraft[gp.player_id] ?? 0;
+        counts[t] = (counts[t] ?? 0) + 1;
+    }
+    // Every team must have exactly teamSize players
+    for (let i = 1; i <= teamCount.value; i++) {
+        if ((counts[i] ?? 0) !== teamSize) return false;
+    }
+    return true;
+});
+
+function initTeamDraft() {
+    // If teams are already assigned, use them; otherwise auto-distribute
+    for (let i = 0; i < gamePlayers.value.length; i++) {
+        const gp = gamePlayers.value[i];
+        if (gp.team !== null && gp.team !== undefined && gp.team > 0) {
+            teamDraft[gp.player_id] = gp.team;
+        } else {
+            // Auto-distribute: alternate between teams
+            teamDraft[gp.player_id] = (i % teamCount.value) + 1;
+        }
+    }
+}
+
+function cycleTeam(playerId: number) {
+    const current = teamDraft[playerId] ?? 1;
+    teamDraft[playerId] = (current % teamCount.value) + 1;
+}
+
+async function saveTeams() {
+    if (!game.value || !teamsValid.value) return;
+    savingTeams.value = true;
+
+    try {
+        const teams: Record<string, number> = {};
+        for (const gp of gamePlayers.value) {
+            teams[String(gp.player_id)] = teamDraft[gp.player_id];
+        }
+
+        const response = await gamesApi.assignTeams(game.value.id, teams);
+        game.value = response.data.data;
+        toast.add({ severity: "success", summary: "Teams Saved", detail: "Team assignments updated", life: 3000 });
+    } catch {
+        toast.add({ severity: "error", summary: "Error", detail: "Failed to save team assignments", life: 5000 });
+    } finally {
+        savingTeams.value = false;
+    }
+}
 
 const effectiveGameConfig = computed<Record<string, unknown>>(() => {
     const base = (scoringConfig.value ?? {}) as Record<string, unknown>;
@@ -482,6 +605,11 @@ async function loadGame() {
         game.value = gameRes.data.data;
         rounds.value = roundsRes.data.data;
         buildScoreMap(rounds.value);
+
+        // Initialize team draft if this is a team game
+        if (isTeamGame.value) {
+            initTeamDraft();
+        }
     } catch (err: unknown) {
         if (err && typeof err === "object" && "response" in err) {
             const axiosError = err as { response?: { data?: { message?: string } } };

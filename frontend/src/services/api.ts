@@ -330,6 +330,12 @@ export const gamesApi = {
                 dealer_game_player_id: dealerGamePlayerId,
             },
         ),
+
+    assignTeams: (id: number, teams: Record<string, number>) =>
+        api.post<ApiResponse<Game>>(
+            `/games/${id}/assign-teams.json`,
+            { teams },
+        ),
 };
 
 // =====================================================
