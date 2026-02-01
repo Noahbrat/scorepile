@@ -14,6 +14,7 @@ use Cake\ORM\Entity;
  * @property int|null $final_rank
  * @property string $total_score
  * @property bool $is_winner
+ * @property int|null $team
  * @property \Cake\I18n\DateTime $created
  * @property \Cake\I18n\DateTime $modified
  *
@@ -29,5 +30,6 @@ class GamePlayer extends Entity
         'final_rank' => true,
         'total_score' => true,
         'is_winner' => true,
+        'team' => true,
     ];
 }

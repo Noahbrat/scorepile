@@ -55,6 +55,7 @@
                             @click="openEditDialog(data)"
                         />
                         <Button
+                            v-if="!data.is_system"
                             icon="pi pi-trash"
                             severity="danger"
                             text

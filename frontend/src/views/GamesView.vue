@@ -150,7 +150,7 @@
                     />
                 </div>
 
-                <div class="mb-6">
+                <div class="mb-4">
                     <label for="players" class="block text-sm font-medium mb-2">
                         Players <span class="text-red-500">*</span> (at least 2)
                     </label>
@@ -164,6 +164,59 @@
                         class="w-full"
                         display="chip"
                     />
+                </div>
+
+                <!-- Team Assignment (for team-based games) -->
+                <div v-if="teamsEnabled && form.player_ids && form.player_ids.length >= 2" class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Team Assignment</label>
+                    <div class="space-y-2">
+                        <div
+                            v-for="playerId in form.player_ids"
+                            :key="playerId"
+                            class="flex items-center gap-3"
+                        >
+                            <span class="text-sm flex-1">
+                                {{ playersStore.players.find(p => p.id === playerId)?.name ?? `Player ${playerId}` }}
+                            </span>
+                            <Select
+                                :modelValue="form.team_assignments?.[playerId] ?? 1"
+                                @update:modelValue="(v: number) => { if (form.team_assignments) form.team_assignments[playerId] = v; }"
+                                :options="[{ label: 'Team 1', value: 1 }, { label: 'Team 2', value: 2 }]"
+                                optionLabel="label"
+                                optionValue="value"
+                                class="w-32"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Config Options (from scoring engine) -->
+                <div v-if="gameConfigOptions.length > 0" class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Game Options</label>
+                    <div class="space-y-3">
+                        <div v-for="opt in gameConfigOptions" :key="opt.key" class="flex items-center gap-3">
+                            <template v-if="opt.type === 'boolean'">
+                                <Checkbox
+                                    :modelValue="(form.game_config?.[opt.key] ?? opt.default) as boolean"
+                                    @update:modelValue="(v: boolean) => { if (form.game_config) form.game_config[opt.key] = v; }"
+                                    :binary="true"
+                                    :inputId="`opt-${opt.key}`"
+                                />
+                                <label :for="`opt-${opt.key}`" class="text-sm">{{ opt.label }}</label>
+                            </template>
+                            <template v-else-if="opt.type === 'select' && opt.choices">
+                                <label class="text-sm flex-1">{{ opt.label }}</label>
+                                <Select
+                                    :modelValue="form.game_config?.[opt.key] ?? opt.default"
+                                    @update:modelValue="(v: unknown) => { if (form.game_config) form.game_config[opt.key] = v; }"
+                                    :options="opt.choices"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    class="w-40"
+                                />
+                            </template>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex justify-end gap-2">
@@ -202,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "primevue/usetoast";
 import Toast from "primevue/toast";
@@ -219,7 +272,8 @@ import InputIcon from "primevue/inputicon";
 import { useGamesStore } from "@/stores/games";
 import { usePlayersStore } from "@/stores/players";
 import { useGameTypesStore } from "@/stores/gameTypes";
-import type { Game, GameInput } from "@/types/api";
+import Checkbox from "primevue/checkbox";
+import type { Game, GameInput, GameType, ScoringConfig } from "@/types/api";
 
 const router = useRouter();
 const toast = useToast();
@@ -246,6 +300,31 @@ const form = reactive<GameInput>({
     name: "",
     game_type_id: null,
     player_ids: [],
+    team_assignments: {},
+    game_config: {},
+});
+
+const selectedGameType = computed<GameType | null>(() => {
+    if (!form.game_type_id) return null;
+    return gameTypesStore.gameTypes.find(gt => gt.id === form.game_type_id) ?? null;
+});
+
+const scoringConfig = computed<ScoringConfig | null>(() => selectedGameType.value?.scoring_config ?? null);
+
+const teamsEnabled = computed(() => scoringConfig.value?.teams?.enabled ?? false);
+
+const gameConfigOptions = computed(() => scoringConfig.value?.options ?? []);
+
+// Reset team assignments and game config when game type changes
+watch(() => form.game_type_id, () => {
+    form.team_assignments = {};
+    form.game_config = {};
+    // Set defaults from scoring config options
+    if (scoringConfig.value?.options) {
+        for (const opt of scoringConfig.value.options) {
+            form.game_config[opt.key] = opt.default;
+        }
+    }
 });
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -270,6 +349,8 @@ function openCreateDialog() {
     form.name = "";
     form.game_type_id = null;
     form.player_ids = [];
+    form.team_assignments = {};
+    form.game_config = {};
     dialogVisible.value = true;
 }
 

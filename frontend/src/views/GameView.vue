@@ -34,11 +34,19 @@
                 </div>
                 <div v-if="game.status === 'active'" class="flex gap-2">
                     <Button
+                        v-if="!hasEngine"
                         label="Add Round"
                         icon="pi pi-plus"
                         severity="info"
                         @click="addRound"
                         :loading="addingRound"
+                    />
+                    <Button
+                        v-if="hasEngine"
+                        label="New Round"
+                        icon="pi pi-plus"
+                        severity="info"
+                        @click="openNewRoundDialog"
                     />
                     <Button
                         label="Complete"
@@ -70,78 +78,241 @@
                 </div>
             </div>
 
-            <!-- Score Table -->
-            <div class="overflow-x-auto -mx-4 sm:mx-0">
-                <table class="w-full border-collapse min-w-0">
-                    <thead>
-                        <tr class="border-b-2 border-surface-300 dark:border-surface-600">
-                            <th class="p-2 text-left text-sm font-semibold sticky left-0 bg-surface-0 dark:bg-surface-900 z-10 min-w-16">
-                                Round
-                            </th>
-                            <th
-                                v-for="gp in gamePlayers"
-                                :key="gp.id"
-                                class="p-2 text-center text-sm font-semibold min-w-20"
-                            >
-                                <div
-                                    class="inline-flex items-center gap-1"
-                                    :class="gp.is_winner ? 'text-yellow-600 dark:text-yellow-400' : ''"
-                                >
-                                    {{ gp.player?.name }}
-                                </div>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="round in rounds"
-                            :key="round.id"
-                            class="border-b border-surface-200 dark:border-surface-700"
+            <!-- Team Assignment (for team games with unassigned players or editing) -->
+            <div v-if="hasEngine && isTeamGame && (needsTeamSetup || editingTeams)" class="mb-6">
+                <div class="border border-surface-200 dark:border-surface-700 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-2">Set Up Teams</h3>
+                    <p class="text-muted-color text-sm mb-4">
+                        Assign players to teams before starting. Drag or tap to move players between teams.
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div
+                            v-for="teamNum in teamCount"
+                            :key="teamNum"
+                            class="border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg p-3 min-h-32"
+                            :class="{ 'border-primary': true }"
                         >
-                            <td class="p-2 text-sm text-muted-color sticky left-0 bg-surface-0 dark:bg-surface-900 z-10">
-                                {{ round.round_number }}
-                            </td>
-                            <td
-                                v-for="gp in gamePlayers"
-                                :key="gp.id"
-                                class="p-1 text-center"
-                            >
-                                <InputNumber
-                                    v-if="game.status === 'active'"
-                                    :modelValue="getScore(round.id, gp.id)"
-                                    @update:modelValue="(val: number | null) => onScoreChange(round.id, gp.id, val)"
-                                    @blur="saveScore(round.id, gp.id)"
-                                    @keyup.enter="($event.target as HTMLElement)?.blur()"
-                                    :input-style="{ width: '5rem', textAlign: 'center' }"
-                                    class="score-input"
-                                    :useGrouping="false"
-                                />
-                                <span v-else class="text-sm">
-                                    {{ getScore(round.id, gp.id) ?? '—' }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr class="border-t-2 border-surface-300 dark:border-surface-600">
-                            <td class="p-2 font-bold text-sm sticky left-0 bg-surface-0 dark:bg-surface-900 z-10">
-                                Total
-                            </td>
-                            <td
-                                v-for="gp in gamePlayers"
-                                :key="gp.id"
-                                class="p-2 text-center font-bold text-lg"
-                            >
-                                {{ playerTotals[gp.id] ?? 0 }}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
+                            <div class="text-sm font-semibold mb-2 text-center">Team {{ teamNum }}</div>
+                            <div class="space-y-2">
+                                <div
+                                    v-for="gp in gamePlayers.filter(p => teamDraft[p.player_id] === teamNum)"
+                                    :key="gp.id"
+                                    class="flex items-center gap-2 p-2 rounded bg-surface-100 dark:bg-surface-800"
+                                >
+                                    <div
+                                        class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                                        :style="{ background: gp.player?.color || 'var(--p-primary-color)' }"
+                                    >
+                                        {{ gp.player?.avatar_emoji || gp.player?.name?.charAt(0).toUpperCase() }}
+                                    </div>
+                                    <span class="flex-1 font-medium text-sm">{{ gp.player?.name }}</span>
+                                    <Button
+                                        icon="pi pi-arrow-right-arrow-left"
+                                        severity="secondary"
+                                        text
+                                        rounded
+                                        size="small"
+                                        @click="cycleTeam(gp.player_id)"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <Button
+                            v-if="editingTeams"
+                            label="Cancel"
+                            severity="secondary"
+                            text
+                            @click="editingTeams = false"
+                        />
+                        <Button
+                            label="Save Teams"
+                            icon="pi pi-check"
+                            :loading="savingTeams"
+                            :disabled="!teamsValid"
+                            @click="saveTeams"
+                        />
+                    </div>
+                    <p v-if="!teamsValid" class="text-red-500 text-xs mt-2 text-right">
+                        Each team needs {{ scoringConfig?.teams?.size ?? 2 }} players
+                    </p>
+                </div>
             </div>
+
+            <!-- Engine Score Table (team-based, e.g., 500) -->
+            <template v-if="hasEngine && isTeamGame && !needsTeamSetup && !editingTeams">
+                <!-- Team totals -->
+                <div class="flex gap-4 mb-4">
+                    <div
+                        v-for="team in teamInfo"
+                        :key="team.number"
+                        class="flex-1 border border-surface-200 dark:border-surface-700 rounded-lg p-3 text-center relative"
+                    >
+                        <div class="text-sm text-muted-color mb-1">{{ team.label }}</div>
+                        <div class="text-2xl font-bold" :class="team.total >= 0 ? '' : 'text-red-600 dark:text-red-400'">
+                            {{ team.total }}
+                        </div>
+                    </div>
+                    <Button
+                        v-if="game?.status === 'active'"
+                        icon="pi pi-pencil"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        class="self-center"
+                        v-tooltip.top="'Edit teams'"
+                        @click="startEditingTeams"
+                    />
+                </div>
+
+                <!-- Round history table -->
+                <div class="overflow-x-auto -mx-4 sm:mx-0">
+                    <table class="w-full border-collapse min-w-0">
+                        <thead>
+                            <tr class="border-b-2 border-surface-300 dark:border-surface-600">
+                                <th class="p-2 text-left text-sm font-semibold min-w-12">#</th>
+                                <th class="p-2 text-left text-sm font-semibold">Bid</th>
+                                <th class="p-2 text-center text-sm font-semibold">Result</th>
+                                <th
+                                    v-for="team in teamInfo"
+                                    :key="team.number"
+                                    class="p-2 text-center text-sm font-semibold min-w-20"
+                                >
+                                    {{ team.shortLabel }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="round in rounds"
+                                :key="round.id"
+                                class="border-b border-surface-200 dark:border-surface-700"
+                            >
+                                <td class="p-2 text-sm text-muted-color">
+                                    {{ round.round_number }}
+                                </td>
+                                <td class="p-2 text-sm">
+                                    <template v-if="round.round_data?.bid_key">
+                                        <span class="font-medium">{{ formatBid(round.round_data) }}</span>
+                                        <span class="text-muted-color text-xs ml-1">
+                                            ({{ bidderTeamLabel(round.round_data) }})
+                                        </span>
+                                    </template>
+                                    <span v-else class="text-muted-color">—</span>
+                                </td>
+                                <td class="p-2 text-center text-sm">
+                                    <Tag
+                                        v-if="round.round_data?.bid_made !== undefined"
+                                        :value="round.round_data.bid_made ? 'Made' : 'Failed'"
+                                        :severity="round.round_data.bid_made ? 'success' : 'danger'"
+                                        class="text-xs"
+                                    />
+                                </td>
+                                <td
+                                    v-for="team in teamInfo"
+                                    :key="team.number"
+                                    class="p-2 text-center text-sm font-medium"
+                                >
+                                    <span :class="getRoundTeamScore(round, team.number) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                                        {{ getRoundTeamScore(round, team.number) >= 0 ? '+' : '' }}{{ getRoundTeamScore(round, team.number) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="border-t-2 border-surface-300 dark:border-surface-600">
+                                <td colspan="3" class="p-2 font-bold text-sm">Total</td>
+                                <td
+                                    v-for="team in teamInfo"
+                                    :key="team.number"
+                                    class="p-2 text-center font-bold text-lg"
+                                >
+                                    {{ team.total }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </template>
+
+            <!-- Simple Score Table (no engine) -->
+            <template v-else-if="!needsTeamSetup && !editingTeams">
+                <div class="overflow-x-auto -mx-4 sm:mx-0">
+                    <table class="w-full border-collapse min-w-0">
+                        <thead>
+                            <tr class="border-b-2 border-surface-300 dark:border-surface-600">
+                                <th class="p-2 text-left text-sm font-semibold sticky left-0 bg-surface-0 dark:bg-surface-900 z-10 min-w-16">
+                                    Round
+                                </th>
+                                <th
+                                    v-for="gp in gamePlayers"
+                                    :key="gp.id"
+                                    class="p-2 text-center text-sm font-semibold min-w-20"
+                                >
+                                    <div
+                                        class="inline-flex items-center gap-1"
+                                        :class="gp.is_winner ? 'text-yellow-600 dark:text-yellow-400' : ''"
+                                    >
+                                        {{ gp.player?.name }}
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="round in rounds"
+                                :key="round.id"
+                                class="border-b border-surface-200 dark:border-surface-700"
+                            >
+                                <td class="p-2 text-sm text-muted-color sticky left-0 bg-surface-0 dark:bg-surface-900 z-10">
+                                    {{ round.round_number }}
+                                </td>
+                                <td
+                                    v-for="gp in gamePlayers"
+                                    :key="gp.id"
+                                    class="p-1 text-center"
+                                >
+                                    <InputNumber
+                                        v-if="game.status === 'active'"
+                                        :modelValue="getScore(round.id, gp.id)"
+                                        @update:modelValue="(val: number | null) => onScoreChange(round.id, gp.id, val)"
+                                        @blur="saveScore(round.id, gp.id)"
+                                        @keyup.enter="($event.target as HTMLElement)?.blur()"
+                                        :input-style="{ width: '5rem', textAlign: 'center' }"
+                                        class="score-input"
+                                        :useGrouping="false"
+                                    />
+                                    <span v-else class="text-sm">
+                                        {{ getScore(round.id, gp.id) ?? '—' }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="border-t-2 border-surface-300 dark:border-surface-600">
+                                <td class="p-2 font-bold text-sm sticky left-0 bg-surface-0 dark:bg-surface-900 z-10">
+                                    Total
+                                </td>
+                                <td
+                                    v-for="gp in gamePlayers"
+                                    :key="gp.id"
+                                    class="p-2 text-center font-bold text-lg"
+                                >
+                                    {{ playerTotals[gp.id] ?? 0 }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </template>
 
             <div v-if="rounds.length === 0 && game.status === 'active'" class="text-center py-8 text-muted-color">
                 <i class="pi pi-table text-4xl mb-4"></i>
-                <p>No rounds yet. Click "Add Round" to start scoring.</p>
+                <p>No rounds yet. Click "{{ hasEngine ? 'New Round' : 'Add Round' }}" to start scoring.</p>
             </div>
         </template>
 
@@ -172,6 +343,23 @@
                 />
             </template>
         </Dialog>
+
+        <!-- New Round Dialog (for engine-based games) -->
+        <Dialog
+            v-model:visible="newRoundDialogVisible"
+            header="New Round"
+            :modal="true"
+            :style="{ width: '500px' }"
+        >
+            <FiveHundredRoundEntry
+                v-if="scoringConfig?.engine === 'five_hundred'"
+                :gamePlayers="gamePlayers"
+                :scoringConfig="scoringConfig"
+                :gameConfig="effectiveGameConfig"
+                :saving="savingRound"
+                @save="handleSaveEngineRound"
+            />
+        </Dialog>
     </div>
 </template>
 
@@ -184,8 +372,9 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import Tag from "primevue/tag";
+import FiveHundredRoundEntry from "@/components/FiveHundredRoundEntry.vue";
 import { gamesApi, roundsApi, scoresApi } from "@/services/api";
-import type { Game, GamePlayer, Round, Score } from "@/types/api";
+import type { Game, GamePlayer, Round, RoundData, ScoringConfig, CalculateRoundResult } from "@/types/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -200,6 +389,11 @@ const error = ref<string | null>(null);
 const addingRound = ref(false);
 const completing = ref(false);
 const completeDialogVisible = ref(false);
+const newRoundDialogVisible = ref(false);
+const savingRound = ref(false);
+const savingTeams = ref(false);
+const editingTeams = ref(false);
+const teamDraft = reactive<Record<number, number>>({});
 
 // Local score edits: key = `${roundId}-${gamePlayerId}`, value = points
 const scoreEdits = reactive<Record<string, number | null>>({});
@@ -209,6 +403,89 @@ const scoreIds = reactive<Record<string, number>>({});
 // ── Computed ─────────────────────────────────────────────────────
 
 const gamePlayers = computed<GamePlayer[]>(() => game.value?.game_players ?? []);
+
+const scoringConfig = computed<ScoringConfig | null>(() =>
+    game.value?.game_type?.scoring_config ?? null
+);
+
+const hasEngine = computed(() => scoringConfig.value !== null && scoringConfig.value.engine !== "simple");
+
+const isTeamGame = computed(() => scoringConfig.value?.teams?.enabled ?? false);
+
+const teamCount = computed(() => {
+    if (!isTeamGame.value || !scoringConfig.value?.teams) return 0;
+    const teamSize = scoringConfig.value.teams.size ?? 2;
+    return Math.ceil(gamePlayers.value.length / teamSize);
+});
+
+const needsTeamSetup = computed(() => {
+    if (!isTeamGame.value) return false;
+    return gamePlayers.value.some(gp => gp.team === null || gp.team === undefined);
+});
+
+const teamsValid = computed(() => {
+    if (!isTeamGame.value || !scoringConfig.value?.teams) return false;
+    const teamSize = scoringConfig.value.teams.size ?? 2;
+    const counts: Record<number, number> = {};
+    for (const gp of gamePlayers.value) {
+        const t = teamDraft[gp.player_id] ?? 0;
+        counts[t] = (counts[t] ?? 0) + 1;
+    }
+    // Every team must have exactly teamSize players
+    for (let i = 1; i <= teamCount.value; i++) {
+        if ((counts[i] ?? 0) !== teamSize) return false;
+    }
+    return true;
+});
+
+function initTeamDraft() {
+    // If teams are already assigned, use them; otherwise auto-distribute
+    for (let i = 0; i < gamePlayers.value.length; i++) {
+        const gp = gamePlayers.value[i];
+        if (gp.team !== null && gp.team !== undefined && gp.team > 0) {
+            teamDraft[gp.player_id] = gp.team;
+        } else {
+            // Auto-distribute: alternate between teams
+            teamDraft[gp.player_id] = (i % teamCount.value) + 1;
+        }
+    }
+}
+
+function startEditingTeams() {
+    initTeamDraft();
+    editingTeams.value = true;
+}
+
+function cycleTeam(playerId: number) {
+    const current = teamDraft[playerId] ?? 1;
+    teamDraft[playerId] = (current % teamCount.value) + 1;
+}
+
+async function saveTeams() {
+    if (!game.value || !teamsValid.value) return;
+    savingTeams.value = true;
+
+    try {
+        const teams: Record<string, number> = {};
+        for (const gp of gamePlayers.value) {
+            teams[String(gp.player_id)] = teamDraft[gp.player_id];
+        }
+
+        const response = await gamesApi.assignTeams(game.value.id, teams);
+        game.value = response.data.data;
+        editingTeams.value = false;
+        toast.add({ severity: "success", summary: "Teams Saved", detail: "Team assignments updated", life: 3000 });
+    } catch {
+        toast.add({ severity: "error", summary: "Error", detail: "Failed to save team assignments", life: 5000 });
+    } finally {
+        savingTeams.value = false;
+    }
+}
+
+const effectiveGameConfig = computed<Record<string, unknown>>(() => {
+    const base = (scoringConfig.value ?? {}) as Record<string, unknown>;
+    return { ...base, ...(game.value?.game_config ?? {}) };
+});
 
 const rankedPlayers = computed<GamePlayer[]>(() => {
     const players = [...gamePlayers.value];
@@ -231,6 +508,78 @@ const playerTotals = computed<Record<number, number>>(() => {
     }
     return totals;
 });
+
+// ── Team helpers ─────────────────────────────────────────────────
+
+interface TeamSummary {
+    number: number;
+    key: string;
+    label: string;
+    shortLabel: string;
+    players: GamePlayer[];
+    total: number;
+}
+
+const teamInfo = computed<TeamSummary[]>(() => {
+    const teamMap: Record<number, GamePlayer[]> = {};
+    for (const gp of gamePlayers.value) {
+        const t = gp.team ?? 0;
+        if (!teamMap[t]) teamMap[t] = [];
+        teamMap[t].push(gp);
+    }
+
+    return Object.keys(teamMap).sort().map(t => {
+        const num = Number(t);
+        const players = teamMap[num];
+        const label = players.map(gp => gp.player?.name ?? `Player ${gp.player_id}`).join(" & ");
+        // Calculate total from playerTotals
+        const total = players.reduce((sum, gp) => sum + (playerTotals.value[gp.id] ?? 0), 0);
+        // Since team members share same score, use first player's total (avoid double counting)
+        const teamTotal = playerTotals.value[players[0]?.id] ?? 0;
+
+        return {
+            number: num,
+            key: `team_${num}`,
+            label,
+            shortLabel: `Team ${num}`,
+            players,
+            total: teamTotal,
+        };
+    });
+});
+
+function getRoundTeamScore(round: Round, teamNumber: number): number {
+    const teamPlayers = gamePlayers.value.filter(gp => gp.team === teamNumber);
+    if (teamPlayers.length === 0) return 0;
+    // All team members share the same score, use first
+    const key = `${round.id}-${teamPlayers[0].id}`;
+    return scoreEdits[key] ?? 0;
+}
+
+// ── Bid formatting helpers ───────────────────────────────────────
+
+const suitSymbols: Record<string, string> = {
+    spades: "\u2660",
+    clubs: "\u2663",
+    diamonds: "\u2666",
+    hearts: "\u2665",
+    no_trump: "NT",
+};
+
+function formatBid(roundData: RoundData): string {
+    if (!roundData.bid_key) return "—";
+    if (roundData.bid_key === "misere") return "Misère";
+    if (roundData.bid_key === "open_misere") return "Open Misère";
+    const tricks = roundData.bid_tricks ?? "";
+    const suit = roundData.bid_suit ?? "";
+    return `${tricks}${suitSymbols[suit] ?? suit}`;
+}
+
+function bidderTeamLabel(roundData: RoundData): string {
+    if (!roundData.bidder_team) return "";
+    const team = teamInfo.value.find(t => t.key === roundData.bidder_team);
+    return team?.shortLabel ?? roundData.bidder_team as string;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -258,7 +607,7 @@ function buildScoreMap(roundsList: Round[]) {
         if (round.scores) {
             for (const score of round.scores) {
                 const key = `${round.id}-${score.game_player_id}`;
-                scoreEdits[key] = score.points;
+                scoreEdits[key] = Number(score.points);
                 scoreIds[key] = score.id;
             }
         }
@@ -281,6 +630,11 @@ async function loadGame() {
         game.value = gameRes.data.data;
         rounds.value = roundsRes.data.data;
         buildScoreMap(rounds.value);
+
+        // Initialize team draft if this is a team game
+        if (isTeamGame.value) {
+            initTeamDraft();
+        }
     } catch (err: unknown) {
         if (err && typeof err === "object" && "response" in err) {
             const axiosError = err as { response?: { data?: { message?: string } } };
@@ -306,6 +660,38 @@ async function addRound() {
         toast.add({ severity: "error", summary: "Error", detail: "Failed to add round", life: 5000 });
     } finally {
         addingRound.value = false;
+    }
+}
+
+function openNewRoundDialog() {
+    newRoundDialogVisible.value = true;
+}
+
+async function handleSaveEngineRound(roundData: RoundData, _calculatedScores: CalculateRoundResult | null) {
+    if (!game.value) return;
+    savingRound.value = true;
+
+    try {
+        const response = await gamesApi.saveRound(game.value.id, roundData);
+        const newRound = response.data.data;
+        rounds.value.push(newRound);
+        buildScoreMap([newRound]);
+        newRoundDialogVisible.value = false;
+
+        // Reload game to get updated totals
+        const gameRes = await gamesApi.getById(game.value.id);
+        game.value = gameRes.data.data;
+
+        toast.add({ severity: "success", summary: "Round Saved", detail: `Round ${newRound.round_number}`, life: 2000 });
+    } catch (err: unknown) {
+        let msg = "Failed to save round";
+        if (err && typeof err === "object" && "response" in err) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            msg = axiosError.response?.data?.message || msg;
+        }
+        toast.add({ severity: "error", summary: "Error", detail: msg, life: 5000 });
+    } finally {
+        savingRound.value = false;
     }
 }
 

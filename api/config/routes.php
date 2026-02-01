@@ -94,10 +94,28 @@ return static function (RouteBuilder $routes) {
             'controller' => 'Api/Games',
         ]);
 
-        // Custom game action: complete a game
+        // Custom game actions
         $routes->connect('/games/{id}/complete', [
             'controller' => 'Games',
             'action' => 'complete',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id']]);
+
+        $routes->connect('/games/{id}/calculate-round', [
+            'controller' => 'Games',
+            'action' => 'calculateRound',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id']]);
+
+        $routes->connect('/games/{id}/save-round', [
+            'controller' => 'Games',
+            'action' => 'saveRound',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id']]);
+
+        $routes->connect('/games/{id}/assign-teams', [
+            'controller' => 'Games',
+            'action' => 'assignTeams',
             'prefix' => 'Api',
         ], ['_method' => ['POST'], 'pass' => ['id']]);
 

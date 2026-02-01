@@ -18,8 +18,10 @@ import type {
     GameInput,
     Round,
     RoundInput,
+    RoundData,
     Score,
     ScoreInput,
+    CalculateRoundResult,
     LoginRequest,
     LoginResponse,
     RegisterRequest,
@@ -313,6 +315,27 @@ export const gamesApi = {
 
     complete: (id: number) =>
         api.post<ApiResponse<Game>>(`/games/${id}/complete.json`),
+
+    calculateRound: (id: number, roundData: RoundData) =>
+        api.post<ApiResponse<CalculateRoundResult>>(
+            `/games/${id}/calculate-round.json`,
+            { round_data: roundData },
+        ),
+
+    saveRound: (id: number, roundData: RoundData, dealerGamePlayerId?: number) =>
+        api.post<ApiResponse<Round>>(
+            `/games/${id}/save-round.json`,
+            {
+                round_data: roundData,
+                dealer_game_player_id: dealerGamePlayerId,
+            },
+        ),
+
+    assignTeams: (id: number, teams: Record<string, number>) =>
+        api.post<ApiResponse<Game>>(
+            `/games/${id}/assign-teams.json`,
+            { teams },
+        ),
 };
 
 // =====================================================

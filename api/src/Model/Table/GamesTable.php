@@ -25,6 +25,8 @@ class GamesTable extends Table
 
         $this->addBehavior('Timestamp');
 
+        $this->getSchema()->setColumnType('game_config', 'json');
+
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
             'joinType' => 'INNER',
