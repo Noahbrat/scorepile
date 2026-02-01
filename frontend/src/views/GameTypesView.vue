@@ -16,7 +16,7 @@
         <!-- Data Table -->
         <DataTable
             :value="gameTypesStore.gameTypes"
-            :loading="gameTypesStore.loading"
+            :loading="gameTypesStore.loading && gameTypesStore.gameTypes.length === 0"
             :paginator="true"
             :rows="gameTypesStore.pagination.limit"
             :totalRecords="gameTypesStore.totalGameTypes"

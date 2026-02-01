@@ -38,7 +38,7 @@
         <!-- Games List -->
         <DataTable
             :value="gamesStore.games"
-            :loading="gamesStore.loading"
+            :loading="gamesStore.loading && gamesStore.games.length === 0"
             :paginator="true"
             :rows="gamesStore.pagination.limit"
             :totalRecords="gamesStore.totalGames"
