@@ -63,7 +63,12 @@ class GameTypesController extends AppController
         $user = $this->requireAuthentication();
 
         $query = $this->GameTypes->find()
-            ->where(['GameTypes.user_id' => $user->id]);
+            ->where([
+                'OR' => [
+                    'GameTypes.user_id' => $user->id,
+                    'GameTypes.is_system' => true,
+                ],
+            ]);
 
         // Pagination
         $page = (int)($this->request->getQuery('page') ?? 1);
@@ -117,7 +122,7 @@ class GameTypesController extends AppController
 
         $gameType = $this->GameTypes->get($id);
 
-        if ($gameType->user_id !== $user->id) {
+        if ($gameType->user_id !== $user->id && !$gameType->is_system) {
             $this->response = $this->response->withStatus(403);
             $this->set([
                 'success' => false,
@@ -220,6 +225,17 @@ class GameTypesController extends AppController
         $user = $this->requireAuthentication();
 
         $gameType = $this->GameTypes->get($id);
+
+        if ($gameType->is_system) {
+            $this->response = $this->response->withStatus(403);
+            $this->set([
+                'success' => false,
+                'message' => 'System game types cannot be deleted',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
 
         if ($gameType->user_id !== $user->id) {
             $this->response = $this->response->withStatus(403);

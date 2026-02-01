@@ -68,6 +68,10 @@ class GamePlayersTable extends Table
         $validator
             ->boolean('is_winner');
 
+        $validator
+            ->integer('team')
+            ->allowEmptyString('team');
+
         return $validator;
     }
 

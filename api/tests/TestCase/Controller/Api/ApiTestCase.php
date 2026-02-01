@@ -119,7 +119,7 @@ abstract class ApiTestCase extends TestCase
         ]);
     }
 
-    protected function createGame(string $userId, string $name = 'Test Game', ?int $gameTypeId = null, string $status = 'active'): \Cake\Datasource\EntityInterface
+    protected function createGame(string $userId, string $name = 'Test Game', ?int $gameTypeId = null, string $status = 'active', ?array $gameConfig = null): \Cake\Datasource\EntityInterface
     {
         $table = TableRegistry::getTableLocator()->get('Games');
         $data = [
@@ -130,19 +130,32 @@ abstract class ApiTestCase extends TestCase
         if ($gameTypeId) {
             $data['game_type_id'] = $gameTypeId;
         }
+        if ($gameConfig !== null) {
+            $data['game_config'] = $gameConfig;
+        }
 
         return $table->saveOrFail($table->newEntity($data));
     }
 
-    protected function createGameType(string $userId, string $direction = 'high_wins', ?string $name = null): \Cake\Datasource\EntityInterface
+    protected function createGameType(string $userId, string $direction = 'high_wins', ?string $name = null, ?array $scoringConfig = null, bool $isSystem = false): \Cake\Datasource\EntityInterface
     {
         $table = TableRegistry::getTableLocator()->get('GameTypes');
 
-        return $table->saveOrFail($table->newEntity([
-            'user_id' => $userId,
+        $data = [
             'name' => $name ?? 'Type ' . uniqid(),
             'scoring_direction' => $direction,
-        ]));
+            'is_system' => $isSystem,
+        ];
+
+        if (!$isSystem) {
+            $data['user_id'] = $userId;
+        }
+
+        if ($scoringConfig !== null) {
+            $data['scoring_config'] = $scoringConfig;
+        }
+
+        return $table->saveOrFail($table->newEntity($data));
     }
 
     protected function createPlayer(string $userId, string $name): \Cake\Datasource\EntityInterface
@@ -155,15 +168,21 @@ abstract class ApiTestCase extends TestCase
         ]));
     }
 
-    protected function addPlayerToGame(int $gameId, int $playerId, float $totalScore = 0): \Cake\Datasource\EntityInterface
+    protected function addPlayerToGame(int $gameId, int $playerId, float $totalScore = 0, ?int $team = null): \Cake\Datasource\EntityInterface
     {
         $table = TableRegistry::getTableLocator()->get('GamePlayers');
 
-        return $table->saveOrFail($table->newEntity([
+        $data = [
             'game_id' => $gameId,
             'player_id' => $playerId,
             'total_score' => $totalScore,
-        ]));
+        ];
+
+        if ($team !== null) {
+            $data['team'] = $team;
+        }
+
+        return $table->saveOrFail($table->newEntity($data));
     }
 
     protected function createRound(int $gameId, int $roundNumber = 1): \Cake\Datasource\EntityInterface

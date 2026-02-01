@@ -14,6 +14,7 @@ use Cake\ORM\Entity;
  * @property string $name
  * @property string $status
  * @property string|null $notes
+ * @property array|null $game_config
  * @property \Cake\I18n\DateTime|null $completed_at
  * @property \Cake\I18n\DateTime $created
  * @property \Cake\I18n\DateTime $modified
@@ -31,6 +32,7 @@ class Game extends Entity
         'name' => true,
         'status' => true,
         'notes' => true,
+        'game_config' => true,
         'completed_at' => true,
     ];
 }

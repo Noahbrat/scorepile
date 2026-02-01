@@ -25,9 +25,11 @@ class GameTypesTable extends Table
 
         $this->addBehavior('Timestamp');
 
+        $this->getSchema()->setColumnType('scoring_config', 'json');
+
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT',
         ]);
 
         $this->hasMany('Games', [
@@ -66,8 +68,30 @@ class GameTypesTable extends Table
 
     public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add($rules->existsIn('user_id', 'Users'), ['message' => 'User does not exist']);
-        $rules->add($rules->isUnique(['user_id', 'name']), ['message' => 'You already have a game type with this name']);
+        $rules->add($rules->existsIn('user_id', 'Users'), [
+            'message' => 'User does not exist',
+            'allowNullableNulls' => true,
+        ]);
+
+        // Enforce unique name per user (application-level since DB unique index
+        // was dropped to support system types with NULL user_id)
+        $rules->add(function ($entity, $options) {
+            if ($entity->user_id === null) {
+                return true; // System types don't enforce per-user uniqueness
+            }
+            $conditions = [
+                'user_id' => $entity->user_id,
+                'name' => $entity->name,
+            ];
+            if (!$entity->isNew()) {
+                $conditions['id !='] = $entity->id;
+            }
+
+            return !$this->exists($conditions);
+        }, 'uniqueNamePerUser', [
+            'errorField' => 'name',
+            'message' => 'This game type name already exists',
+        ]);
 
         return $rules;
     }

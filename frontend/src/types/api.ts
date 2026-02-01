@@ -103,16 +103,60 @@ export type PlayerInput = Omit<Player, "id" | "user_id" | "created" | "modified"
 
 export interface GameType {
     id: number;
-    user_id: string;
+    user_id: string | null;
     name: string;
     description?: string;
     scoring_direction: "high_wins" | "low_wins";
     default_rounds?: number;
+    scoring_config: ScoringConfig | null;
+    is_system: boolean;
     created?: string;
     modified?: string;
 }
 
-export type GameTypeInput = Omit<GameType, "id" | "user_id" | "created" | "modified">;
+export type GameTypeInput = Omit<GameType, "id" | "user_id" | "created" | "modified" | "is_system" | "scoring_config">;
+
+// =====================================================
+// Scoring Engine Configuration
+// =====================================================
+
+export interface ScoringConfig {
+    engine: string;
+    scoring_direction: string;
+    win_condition: string;
+    target_score?: number;
+    lose_score?: number;
+    track_dealer: boolean;
+    teams?: { enabled: boolean; size: number };
+    options?: ConfigOption[];
+    bid_table?: Record<string, number>;
+    scoring_rules?: Record<string, string | number>;
+}
+
+export interface ConfigOption {
+    key: string;
+    label: string;
+    type: "boolean" | "number" | "select";
+    choices?: { value: number | string | boolean; label: string }[];
+    default: number | string | boolean;
+    visible_when?: Record<string, unknown>;
+}
+
+export interface RoundData {
+    [key: string]: unknown;
+    bidder_team?: string;
+    bid_tricks?: number;
+    bid_suit?: string;
+    bid_key?: string;
+    tricks_won?: Record<string, number>;
+    bid_made?: boolean;
+}
+
+export interface CalculateRoundResult {
+    scores: Record<string, number>;
+    bid_made: boolean;
+    bid_value: number;
+}
 
 // =====================================================
 // Game
@@ -125,6 +169,7 @@ export interface Game {
     name: string;
     status: "active" | "completed" | "abandoned";
     notes?: string;
+    game_config?: Record<string, unknown> | null;
     completed_at?: string;
     created?: string;
     modified?: string;
@@ -138,6 +183,8 @@ export interface GameInput {
     game_type_id?: number | null;
     notes?: string;
     player_ids?: number[];
+    game_config?: Record<string, unknown>;
+    team_assignments?: Record<number, number>;
 }
 
 // =====================================================
@@ -151,6 +198,7 @@ export interface GamePlayer {
     final_rank?: number;
     total_score: number;
     is_winner: boolean;
+    team?: number | null;
     created?: string;
     modified?: string;
     player?: Player;
@@ -166,6 +214,8 @@ export interface Round {
     game_id: number;
     round_number: number;
     name?: string;
+    dealer_game_player_id?: number | null;
+    round_data?: RoundData | null;
     created?: string;
     modified?: string;
     scores?: Score[];
@@ -175,6 +225,8 @@ export interface RoundInput {
     game_id: number;
     round_number?: number;
     name?: string;
+    round_data?: RoundData;
+    dealer_game_player_id?: number;
 }
 
 // =====================================================

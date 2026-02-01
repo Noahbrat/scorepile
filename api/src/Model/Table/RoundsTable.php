@@ -25,9 +25,17 @@ class RoundsTable extends Table
 
         $this->addBehavior('Timestamp');
 
+        $this->getSchema()->setColumnType('round_data', 'json');
+
         $this->belongsTo('Games', [
             'foreignKey' => 'game_id',
             'joinType' => 'INNER',
+        ]);
+
+        $this->belongsTo('DealerGamePlayers', [
+            'className' => 'GamePlayers',
+            'foreignKey' => 'dealer_game_player_id',
+            'joinType' => 'LEFT',
         ]);
 
         $this->hasMany('Scores', [
@@ -65,6 +73,10 @@ class RoundsTable extends Table
     public function buildRules(RulesChecker $rules): RulesChecker
     {
         $rules->add($rules->existsIn('game_id', 'Games'), ['message' => 'Game does not exist']);
+        $rules->add($rules->existsIn('dealer_game_player_id', 'DealerGamePlayers'), [
+            'message' => 'Dealer game player does not exist',
+            'allowNullableNulls' => true,
+        ]);
         $rules->add($rules->isUnique(['game_id', 'round_number']), ['message' => 'This round number already exists for this game']);
 
         return $rules;
