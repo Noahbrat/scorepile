@@ -78,8 +78,8 @@
                 </div>
             </div>
 
-            <!-- Team Assignment (for team games with unassigned players) -->
-            <div v-if="hasEngine && isTeamGame && needsTeamSetup" class="mb-6">
+            <!-- Team Assignment (for team games with unassigned players or editing) -->
+            <div v-if="hasEngine && isTeamGame && (needsTeamSetup || editingTeams)" class="mb-6">
                 <div class="border border-surface-200 dark:border-surface-700 rounded-lg p-6">
                     <h3 class="text-lg font-semibold mb-2">Set Up Teams</h3>
                     <p class="text-muted-color text-sm mb-4">
@@ -122,6 +122,13 @@
 
                     <div class="flex justify-end gap-2">
                         <Button
+                            v-if="editingTeams"
+                            label="Cancel"
+                            severity="secondary"
+                            text
+                            @click="editingTeams = false"
+                        />
+                        <Button
                             label="Save Teams"
                             icon="pi pi-check"
                             :loading="savingTeams"
@@ -136,19 +143,30 @@
             </div>
 
             <!-- Engine Score Table (team-based, e.g., 500) -->
-            <template v-if="hasEngine && isTeamGame && !needsTeamSetup">
+            <template v-if="hasEngine && isTeamGame && !needsTeamSetup && !editingTeams">
                 <!-- Team totals -->
                 <div class="flex gap-4 mb-4">
                     <div
                         v-for="team in teamInfo"
                         :key="team.number"
-                        class="flex-1 border border-surface-200 dark:border-surface-700 rounded-lg p-3 text-center"
+                        class="flex-1 border border-surface-200 dark:border-surface-700 rounded-lg p-3 text-center relative"
                     >
                         <div class="text-sm text-muted-color mb-1">{{ team.label }}</div>
                         <div class="text-2xl font-bold" :class="team.total >= 0 ? '' : 'text-red-600 dark:text-red-400'">
                             {{ team.total }}
                         </div>
                     </div>
+                    <Button
+                        v-if="game?.status === 'active'"
+                        icon="pi pi-pencil"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        class="self-center"
+                        v-tooltip.top="'Edit teams'"
+                        @click="startEditingTeams"
+                    />
                 </div>
 
                 <!-- Round history table -->
@@ -222,7 +240,7 @@
             </template>
 
             <!-- Simple Score Table (no engine) -->
-            <template v-else>
+            <template v-else-if="!needsTeamSetup && !editingTeams">
                 <div class="overflow-x-auto -mx-4 sm:mx-0">
                     <table class="w-full border-collapse min-w-0">
                         <thead>
@@ -374,6 +392,7 @@ const completeDialogVisible = ref(false);
 const newRoundDialogVisible = ref(false);
 const savingRound = ref(false);
 const savingTeams = ref(false);
+const editingTeams = ref(false);
 const teamDraft = reactive<Record<number, number>>({});
 
 // Local score edits: key = `${roundId}-${gamePlayerId}`, value = points
@@ -432,6 +451,11 @@ function initTeamDraft() {
     }
 }
 
+function startEditingTeams() {
+    initTeamDraft();
+    editingTeams.value = true;
+}
+
 function cycleTeam(playerId: number) {
     const current = teamDraft[playerId] ?? 1;
     teamDraft[playerId] = (current % teamCount.value) + 1;
@@ -449,6 +473,7 @@ async function saveTeams() {
 
         const response = await gamesApi.assignTeams(game.value.id, teams);
         game.value = response.data.data;
+        editingTeams.value = false;
         toast.add({ severity: "success", summary: "Teams Saved", detail: "Team assignments updated", life: 3000 });
     } catch {
         toast.add({ severity: "error", summary: "Error", detail: "Failed to save team assignments", life: 5000 });
