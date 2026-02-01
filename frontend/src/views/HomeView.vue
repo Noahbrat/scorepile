@@ -61,7 +61,7 @@
                         <div class="space-y-2 text-sm mb-4">
                             <div class="flex justify-between">
                                 <span class="text-muted-color">Total Players</span>
-                                <span class="font-semibold">{{ playersStore.totalPlayers }}</span>
+                                <span class="font-semibold">{{ playersStore.poolTotal }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-muted-color">Account Status</span>
@@ -127,7 +127,7 @@ onMounted(async () => {
     try {
         await Promise.all([
             gamesStore.fetchGames(1, 20),
-            playersStore.fetchPlayers(1, 1),
+            playersStore.fetchPoolTotal(),
         ]);
     } catch {
         // non-critical — just won't show stats
