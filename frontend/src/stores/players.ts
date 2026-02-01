@@ -26,9 +26,13 @@ export const usePlayersStore = defineStore("players", () => {
     const sortField = ref<string | undefined>("name");
     const sortDirection = ref<"asc" | "desc">("asc");
 
+    // Pool total — the unfiltered count of all players (never affected by search)
+    const poolTotal = ref(0);
+
     // ── Getters ──────────────────────────────────────────────────
     const hasPlayers = computed(() => players.value.length > 0);
     const totalPlayers = computed(() => pagination.value.total);
+    const isFiltered = computed(() => !!searchQuery.value);
 
     // ── Actions ──────────────────────────────────────────────────
 
@@ -58,6 +62,11 @@ export const usePlayersStore = defineStore("players", () => {
                     total: pg.total,
                     totalPages: pg.pages,
                 };
+
+                // Track unfiltered pool total
+                if (!searchQuery.value) {
+                    poolTotal.value = pg.total;
+                }
             }
         } catch (err: unknown) {
             error.value = extractError(err, "Failed to fetch players");
@@ -146,6 +155,21 @@ export const usePlayersStore = defineStore("players", () => {
         }
     }
 
+    /**
+     * Fetch just the pool total without affecting search state or player list.
+     * Used by the Dashboard to get an accurate count regardless of search filters.
+     */
+    async function fetchPoolTotal() {
+        try {
+            const response = await playersApi.getAll(1, 1, undefined, "asc", undefined);
+            if (response.data.pagination) {
+                poolTotal.value = response.data.pagination.total;
+            }
+        } catch {
+            // non-critical
+        }
+    }
+
     function setSearch(query: string) {
         searchQuery.value = query;
     }
@@ -180,12 +204,15 @@ export const usePlayersStore = defineStore("players", () => {
         searchQuery,
         sortField,
         sortDirection,
+        poolTotal,
         // Getters
         hasPlayers,
         totalPlayers,
+        isFiltered,
         // Actions
         fetchPlayers,
         fetchPlayer,
+        fetchPoolTotal,
         createPlayer,
         updatePlayer,
         deletePlayer,

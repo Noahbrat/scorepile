@@ -7,7 +7,13 @@
             <div>
                 <h1 class="text-3xl font-bold">Players</h1>
                 <p class="text-muted-color mt-1">
-                    Manage your player pool — {{ playersStore.totalPlayers }} total
+                    Manage your player pool —
+                    <template v-if="playersStore.isFiltered">
+                        {{ playersStore.totalPlayers }} of {{ playersStore.poolTotal }} players
+                    </template>
+                    <template v-else>
+                        {{ playersStore.totalPlayers }} total
+                    </template>
                 </p>
             </div>
             <Button label="New Player" icon="pi pi-plus" @click="openCreateDialog" />
@@ -21,6 +27,7 @@
                     v-model="searchInput"
                     placeholder="Search players..."
                     class="w-full sm:w-80"
+                    @input="debouncedSearch"
                     @keyup.enter="handleSearch"
                 />
             </IconField>
@@ -151,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted } from "vue";
 import { useToast } from "primevue/usetoast";
 import Toast from "primevue/toast";
 import Dialog from "primevue/dialog";
@@ -236,15 +243,34 @@ async function handleDelete() {
     }
 }
 
+// ── Search with debounce ────────────────────────────────────────
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 function handleSearch() {
+    if (searchTimeout) clearTimeout(searchTimeout);
     playersStore.setSearch(searchInput.value);
     playersStore.setPage(1);
     playersStore.fetchPlayers();
 }
 
+function debouncedSearch() {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        handleSearch();
+    }, 300);
+}
+
+onUnmounted(() => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+});
+
 // ── Init ────────────────────────────────────────────────────────
 
 onMounted(() => {
+    // Reset search state when entering the players page
+    playersStore.setSearch("");
+    searchInput.value = "";
     playersStore.fetchPlayers();
 });
 </script>
