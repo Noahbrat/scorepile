@@ -607,7 +607,7 @@ function buildScoreMap(roundsList: Round[]) {
         if (round.scores) {
             for (const score of round.scores) {
                 const key = `${round.id}-${score.game_player_id}`;
-                scoreEdits[key] = score.points;
+                scoreEdits[key] = Number(score.points);
                 scoreIds[key] = score.id;
             }
         }
