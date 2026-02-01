@@ -194,6 +194,11 @@
                             >
                                 <td class="p-2 text-sm text-muted-color">
                                     {{ round.round_number }}
+                                    <span
+                                        v-if="trackDealer && getDealerName(round.dealer_game_player_id)"
+                                        class="block text-xs"
+                                        :title="`Dealer: ${getDealerName(round.dealer_game_player_id)}`"
+                                    >🃏 {{ getDealerName(round.dealer_game_player_id) }}</span>
                                 </td>
                                 <td class="p-2 text-sm">
                                     <template v-if="round.round_data?.bid_key">
@@ -351,6 +356,22 @@
             :modal="true"
             :style="{ width: '500px' }"
         >
+            <!-- Dealer selector -->
+            <div v-if="trackDealer" class="mb-4">
+                <label class="block text-sm font-medium mb-2">Dealer</label>
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-for="gp in gamePlayers"
+                        :key="gp.id"
+                        :label="gp.player?.name ?? 'Player'"
+                        :severity="currentDealerId === gp.id ? 'primary' : 'secondary'"
+                        :outlined="currentDealerId !== gp.id"
+                        size="small"
+                        @click="currentDealerId = gp.id"
+                    />
+                </div>
+            </div>
+
             <FiveHundredRoundEntry
                 v-if="scoringConfig?.engine === 'five_hundred'"
                 :gamePlayers="gamePlayers"
@@ -394,6 +415,7 @@ const savingRound = ref(false);
 const savingTeams = ref(false);
 const editingTeams = ref(false);
 const teamDraft = reactive<Record<number, number>>({});
+const currentDealerId = ref<number | null>(null);
 
 // Local score edits: key = `${roundId}-${gamePlayerId}`, value = points
 const scoreEdits = reactive<Record<string, number | null>>({});
@@ -556,6 +578,49 @@ function getRoundTeamScore(round: Round, teamNumber: number): number {
     return scoreEdits[key] ?? 0;
 }
 
+// ── Dealer tracking ──────────────────────────────────────────────
+
+const trackDealer = computed(() => scoringConfig.value?.track_dealer ?? false);
+
+const dealerPlayer = computed(() => {
+    if (!currentDealerId.value) return null;
+    return gamePlayers.value.find(gp => gp.id === currentDealerId.value) ?? null;
+});
+
+/**
+ * Determine dealer for the next round:
+ * - If there are existing rounds with a dealer, advance from the last one
+ * - Otherwise, default to the first player (user can change)
+ */
+function initDealer() {
+    if (!trackDealer.value || gamePlayers.value.length === 0) return;
+
+    // Check last round for dealer
+    const lastRound = rounds.value.length > 0
+        ? rounds.value[rounds.value.length - 1]
+        : null;
+
+    if (lastRound?.dealer_game_player_id) {
+        // Advance to next player
+        currentDealerId.value = getNextDealer(lastRound.dealer_game_player_id);
+    } else {
+        // Default to first player
+        currentDealerId.value = gamePlayers.value[0]?.id ?? null;
+    }
+}
+
+function getNextDealer(currentId: number): number {
+    const idx = gamePlayers.value.findIndex(gp => gp.id === currentId);
+    const nextIdx = (idx + 1) % gamePlayers.value.length;
+    return gamePlayers.value[nextIdx].id;
+}
+
+function getDealerName(dealerGamePlayerId: number | null | undefined): string | null {
+    if (!dealerGamePlayerId) return null;
+    const gp = gamePlayers.value.find(p => p.id === dealerGamePlayerId);
+    return gp?.player?.name ?? null;
+}
+
 // ── Bid formatting helpers ───────────────────────────────────────
 
 const suitSymbols: Record<string, string> = {
@@ -635,6 +700,11 @@ async function loadGame() {
         if (isTeamGame.value) {
             initTeamDraft();
         }
+
+        // Initialize dealer tracking
+        if (trackDealer.value) {
+            initDealer();
+        }
     } catch (err: unknown) {
         if (err && typeof err === "object" && "response" in err) {
             const axiosError = err as { response?: { data?: { message?: string } } };
@@ -672,11 +742,17 @@ async function handleSaveEngineRound(roundData: RoundData, _calculatedScores: Ca
     savingRound.value = true;
 
     try {
-        const response = await gamesApi.saveRound(game.value.id, roundData);
+        const dealerId = trackDealer.value ? currentDealerId.value ?? undefined : undefined;
+        const response = await gamesApi.saveRound(game.value.id, roundData, dealerId);
         const newRound = response.data.data;
         rounds.value.push(newRound);
         buildScoreMap([newRound]);
         newRoundDialogVisible.value = false;
+
+        // Advance dealer for next round
+        if (trackDealer.value && currentDealerId.value) {
+            currentDealerId.value = getNextDealer(currentDealerId.value);
+        }
 
         // Reload game to get updated totals
         const gameRes = await gamesApi.getById(game.value.id);
