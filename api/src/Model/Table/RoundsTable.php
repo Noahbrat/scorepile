@@ -67,6 +67,11 @@ class RoundsTable extends Table
             ->maxLength('name', 100)
             ->allowEmptyString('name');
 
+        $validator
+            ->scalar('status')
+            ->inList('status', ['bidding', 'playing', 'scoring', 'completed'], 'Invalid round status')
+            ->notEmptyString('status');
+
         return $validator;
     }
 

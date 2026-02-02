@@ -164,6 +164,238 @@ class GamesControllerTest extends ApiTestCase
         $this->assertNotNull($body['data']['completed_at']);
     }
 
+    /**
+     * Two-step round flow: bid-only save creates a 'playing' round
+     */
+    public function testSaveRoundBidOnlyCreatesPlayingRound(): void
+    {
+        $scoringConfig = [
+            'engine' => 'five_hundred',
+            'scoring_direction' => 'high_wins',
+            'teams' => ['enabled' => true, 'size' => 2],
+            'bid_table' => [
+                '7_hearts' => 200,
+            ],
+        ];
+        $gameType = $this->createGameType($this->userId, 'high_wins', '500', $scoringConfig, true);
+        $game = $this->createGame($this->userId, 'Five Hundred', $gameType->id);
+
+        $p1 = $this->createPlayer($this->userId, 'Alice');
+        $p2 = $this->createPlayer($this->userId, 'Bob');
+        $p3 = $this->createPlayer($this->userId, 'Carol');
+        $p4 = $this->createPlayer($this->userId, 'Dave');
+        $this->addPlayerToGame($game->id, $p1->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p2->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p3->id, 0, 2);
+        $this->addPlayerToGame($game->id, $p4->id, 0, 2);
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/save-round.json", json_encode([
+            'round_data' => [
+                'bidder_team' => 'team_1',
+                'bid_key' => '7_hearts',
+                'bid_tricks' => 7,
+                'bid_suit' => 'hearts',
+            ],
+        ]));
+
+        $this->assertResponseCode(201);
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertTrue($body['success']);
+        $this->assertEquals('playing', $body['data']['status']);
+        $this->assertEquals(1, $body['data']['round_number']);
+        // No scores for a playing round
+        $this->assertEmpty($body['data']['scores']);
+    }
+
+    /**
+     * Full save in one shot still works (backward compat)
+     */
+    public function testSaveRoundFullSaveCreatesCompletedRound(): void
+    {
+        $scoringConfig = [
+            'engine' => 'five_hundred',
+            'scoring_direction' => 'high_wins',
+            'teams' => ['enabled' => true, 'size' => 2],
+            'bid_table' => [
+                '7_hearts' => 200,
+            ],
+        ];
+        $gameType = $this->createGameType($this->userId, 'high_wins', '500 Full', $scoringConfig, true);
+        $game = $this->createGame($this->userId, 'Full Save', $gameType->id);
+
+        $p1 = $this->createPlayer($this->userId, 'Alice');
+        $p2 = $this->createPlayer($this->userId, 'Bob');
+        $p3 = $this->createPlayer($this->userId, 'Carol');
+        $p4 = $this->createPlayer($this->userId, 'Dave');
+        $this->addPlayerToGame($game->id, $p1->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p2->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p3->id, 0, 2);
+        $this->addPlayerToGame($game->id, $p4->id, 0, 2);
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/save-round.json", json_encode([
+            'round_data' => [
+                'bidder_team' => 'team_1',
+                'bid_key' => '7_hearts',
+                'bid_tricks' => 7,
+                'bid_suit' => 'hearts',
+                'tricks_won' => [
+                    'team_1' => 8,
+                    'team_2' => 2,
+                ],
+            ],
+        ]));
+
+        $this->assertResponseCode(201);
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertTrue($body['success']);
+        $this->assertEquals('completed', $body['data']['status']);
+        $this->assertNotEmpty($body['data']['scores']);
+    }
+
+    /**
+     * completeRound transitions a playing round to completed with scores
+     */
+    public function testCompleteRoundTransitionsPlayingToCompleted(): void
+    {
+        $scoringConfig = [
+            'engine' => 'five_hundred',
+            'scoring_direction' => 'high_wins',
+            'teams' => ['enabled' => true, 'size' => 2],
+            'bid_table' => [
+                '7_hearts' => 200,
+            ],
+        ];
+        $gameType = $this->createGameType($this->userId, 'high_wins', '500 CR', $scoringConfig, true);
+        $game = $this->createGame($this->userId, 'Complete Round', $gameType->id);
+
+        $p1 = $this->createPlayer($this->userId, 'Alice');
+        $p2 = $this->createPlayer($this->userId, 'Bob');
+        $p3 = $this->createPlayer($this->userId, 'Carol');
+        $p4 = $this->createPlayer($this->userId, 'Dave');
+        $this->addPlayerToGame($game->id, $p1->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p2->id, 0, 1);
+        $this->addPlayerToGame($game->id, $p3->id, 0, 2);
+        $this->addPlayerToGame($game->id, $p4->id, 0, 2);
+
+        // Create a playing round
+        $round = $this->createRound($game->id, 1, 'playing', [
+            'bidder_team' => 'team_1',
+            'bid_key' => '7_hearts',
+            'bid_tricks' => 7,
+            'bid_suit' => 'hearts',
+        ]);
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/rounds/{$round->id}/complete.json", json_encode([
+            'tricks_won' => [
+                'team_1' => 8,
+                'team_2' => 2,
+            ],
+        ]));
+
+        $this->assertResponseOk();
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertTrue($body['success']);
+        $this->assertEquals('completed', $body['data']['status']);
+        $this->assertNotEmpty($body['data']['scores']);
+        // Verify bid_made was set
+        $this->assertTrue($body['data']['round_data']['bid_made']);
+    }
+
+    /**
+     * completeRound rejects if round is not in 'playing' status
+     */
+    public function testCompleteRoundRejectsNonPlayingRound(): void
+    {
+        $scoringConfig = [
+            'engine' => 'five_hundred',
+            'scoring_direction' => 'high_wins',
+            'teams' => ['enabled' => true, 'size' => 2],
+            'bid_table' => [
+                '7_hearts' => 200,
+            ],
+        ];
+        $gameType = $this->createGameType($this->userId, 'high_wins', '500 Rej', $scoringConfig, true);
+        $game = $this->createGame($this->userId, 'Reject Test', $gameType->id);
+
+        $round = $this->createRound($game->id, 1, 'completed');
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/rounds/{$round->id}/complete.json", json_encode([
+            'tricks_won' => ['team_1' => 8, 'team_2' => 2],
+        ]));
+
+        $this->assertResponseCode(400);
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertFalse($body['success']);
+        $this->assertStringContainsString('not in playing status', $body['message']);
+    }
+
+    /**
+     * cancelRound deletes a playing round
+     */
+    public function testCancelRoundDeletesPlayingRound(): void
+    {
+        $game = $this->createGame($this->userId, 'Cancel Test');
+        $round = $this->createRound($game->id, 1, 'playing', [
+            'bidder_team' => 'team_1',
+            'bid_key' => '7_hearts',
+        ]);
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/rounds/{$round->id}/cancel.json");
+
+        $this->assertResponseOk();
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertTrue($body['success']);
+
+        $roundsTable = TableRegistry::getTableLocator()->get('Rounds');
+        $this->assertFalse($roundsTable->exists(['id' => $round->id]));
+    }
+
+    /**
+     * cancelRound rejects cancelling a completed round
+     */
+    public function testCancelRoundRejectsCompletedRound(): void
+    {
+        $game = $this->createGame($this->userId, 'Cancel Reject');
+        $round = $this->createRound($game->id, 1, 'completed');
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/rounds/{$round->id}/cancel.json");
+
+        $this->assertResponseCode(400);
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertFalse($body['success']);
+    }
+
+    /**
+     * Cannot start a new round while one is in progress
+     */
+    public function testSaveRoundRejectsWhenPlayingRoundExists(): void
+    {
+        $game = $this->createGame($this->userId, 'Reject Dup');
+        $this->createRound($game->id, 1, 'playing', [
+            'bidder_team' => 'team_1',
+            'bid_key' => '7_hearts',
+        ]);
+
+        $this->setAuth();
+        $this->post("/api/games/{$game->id}/save-round.json", json_encode([
+            'round_data' => [
+                'bidder_team' => 'team_2',
+                'bid_key' => '7_hearts',
+            ],
+        ]));
+
+        $this->assertResponseCode(400);
+        $body = json_decode((string)$this->_response->getBody(), true);
+        $this->assertFalse($body['success']);
+        $this->assertStringContainsString('already in progress', $body['message']);
+    }
+
     public function testDeleteCascadesToRoundsAndScores(): void
     {
         $game = $this->createGame($this->userId);

@@ -1,5 +1,5 @@
 <template>
-    <div class="five-hundred-round-entry">
+    <div class="five-hundred-bid-entry">
         <!-- Bidding Team -->
         <div class="mb-4">
             <label class="block text-sm font-medium mb-2">Bidding Team</label>
@@ -69,80 +69,10 @@
             </div>
         </div>
 
-        <!-- Tricks Won -->
-        <div v-if="selectedBidKey && !isMisereBid" class="mb-4">
-            <label class="block text-sm font-medium mb-2">Tricks Won by Bidding Team</label>
-            <div class="flex items-center gap-4">
-                <InputNumber
-                    v-model="bidderTricksWon"
-                    :min="0"
-                    :max="10"
-                    showButtons
-                    buttonLayout="horizontal"
-                    :inputStyle="{ width: '4rem', textAlign: 'center' }"
-                    decrementButtonClass="p-button-secondary"
-                    incrementButtonClass="p-button-secondary"
-                    incrementButtonIcon="pi pi-plus"
-                    decrementButtonIcon="pi pi-minus"
-                />
-                <div class="text-sm text-muted-color">
-                    Opponent: {{ 10 - (bidderTricksWon ?? 0) }} tricks
-                </div>
-            </div>
-        </div>
-
-        <!-- Misère tricks (0 or not) -->
-        <div v-if="selectedBidKey && isMisereBid" class="mb-4">
-            <label class="block text-sm font-medium mb-2">Did the bidder take any tricks?</label>
-            <div class="flex gap-2">
-                <Button
-                    label="No tricks (success)"
-                    :severity="bidderTricksWon === 0 ? 'success' : 'secondary'"
-                    :outlined="bidderTricksWon !== 0"
-                    class="flex-1"
-                    @click="bidderTricksWon = 0"
-                />
-                <Button
-                    label="Took tricks (failed)"
-                    :severity="bidderTricksWon !== null && bidderTricksWon > 0 ? 'danger' : 'secondary'"
-                    :outlined="bidderTricksWon === null || bidderTricksWon === 0"
-                    class="flex-1"
-                    @click="bidderTricksWon = 1"
-                />
-            </div>
-        </div>
-
-        <!-- Score Preview -->
-        <div v-if="previewScores" class="mb-4 border border-surface-200 dark:border-surface-700 rounded-lg p-3">
-            <h4 class="text-sm font-semibold mb-2">Score Preview</h4>
-            <div class="space-y-1">
-                <div
-                    v-for="team in teams"
-                    :key="team.key"
-                    class="flex justify-between items-center"
-                >
-                    <span class="text-sm">{{ team.label }}</span>
-                    <span
-                        class="font-bold text-lg"
-                        :class="(previewScores.scores[team.key] ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                    >
-                        {{ (previewScores.scores[team.key] ?? 0) >= 0 ? '+' : '' }}{{ previewScores.scores[team.key] ?? 0 }}
-                    </span>
-                </div>
-                <div class="pt-1 border-t border-surface-200 dark:border-surface-700">
-                    <Tag
-                        :value="previewScores.bid_made ? 'Bid Made' : 'Bid Failed'"
-                        :severity="previewScores.bid_made ? 'success' : 'danger'"
-                        class="text-xs"
-                    />
-                </div>
-            </div>
-        </div>
-
-        <!-- Save Button -->
+        <!-- Start Round Button -->
         <Button
-            label="Save Round"
-            icon="pi pi-check"
+            label="Start Round"
+            icon="pi pi-play"
             class="w-full"
             :loading="saving"
             :disabled="!isValid"
@@ -152,11 +82,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import Button from "primevue/button";
-import InputNumber from "primevue/inputnumber";
-import Tag from "primevue/tag";
-import type { GamePlayer, RoundData, ScoringConfig, CalculateRoundResult } from "@/types/api";
+import type { GamePlayer, RoundData, ScoringConfig } from "@/types/api";
 
 const props = defineProps<{
     gamePlayers: GamePlayer[];
@@ -166,7 +94,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    save: [roundData: RoundData, calculatedScores: CalculateRoundResult | null];
+    save: [roundData: RoundData];
 }>();
 
 // ── Bid table ────────────────────────────────────────────────────
@@ -207,11 +135,6 @@ const selectedBidderTeam = ref<string | null>(null);
 const selectedBidKey = ref<string | null>(null);
 const selectedBidTricks = ref<number | null>(null);
 const selectedBidSuit = ref<string | null>(null);
-const bidderTricksWon = ref<number | null>(null);
-
-const isMisereBid = computed(() =>
-    selectedBidKey.value === "misere" || selectedBidKey.value === "open_misere"
-);
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -232,49 +155,12 @@ function selectBid(tricks: number | null, suit: string | null, bidKey: string) {
     selectedBidKey.value = bidKey;
     selectedBidTricks.value = tricks;
     selectedBidSuit.value = suit;
-    // Reset tricks when changing bid
-    bidderTricksWon.value = null;
 }
-
-// ── Score calculation (client-side preview) ──────────────────────
-
-const previewScores = computed<CalculateRoundResult | null>(() => {
-    if (!selectedBidKey.value || !selectedBidderTeam.value || bidderTricksWon.value === null) {
-        return null;
-    }
-
-    const bidValue = bidTable.value[selectedBidKey.value] ?? 0;
-    if (bidValue === 0) return null;
-
-    const opponentTeam = teams.value.find(t => t.key !== selectedBidderTeam.value);
-    if (!opponentTeam) return null;
-
-    const opponentTricks = isMisereBid.value ? 0 : 10 - bidderTricksWon.value;
-    let bidMade: boolean;
-    const scores: Record<string, number> = {};
-
-    if (isMisereBid.value) {
-        bidMade = bidderTricksWon.value === 0;
-        scores[selectedBidderTeam.value] = bidMade ? bidValue : -bidValue;
-        scores[opponentTeam.key] = 0;
-    } else {
-        bidMade = bidderTricksWon.value >= (selectedBidTricks.value ?? 0);
-        scores[selectedBidderTeam.value] = bidMade ? bidValue : -bidValue;
-        scores[opponentTeam.key] = opponentTricks * 10;
-    }
-
-    return { scores, bid_made: bidMade, bid_value: bidValue };
-});
 
 // ── Validation ───────────────────────────────────────────────────
 
 const isValid = computed(() => {
-    return (
-        selectedBidderTeam.value !== null &&
-        selectedBidKey.value !== null &&
-        bidderTricksWon.value !== null &&
-        previewScores.value !== null
-    );
+    return selectedBidderTeam.value !== null && selectedBidKey.value !== null;
 });
 
 // ── Save ─────────────────────────────────────────────────────────
@@ -282,32 +168,19 @@ const isValid = computed(() => {
 function handleSave() {
     if (!isValid.value || !selectedBidderTeam.value || !selectedBidKey.value) return;
 
-    const opponentTeam = teams.value.find(t => t.key !== selectedBidderTeam.value);
-    const opponentTricks = isMisereBid.value ? (10 - (bidderTricksWon.value ?? 0)) : (10 - (bidderTricksWon.value ?? 0));
-
     const roundData: RoundData = {
         bidder_team: selectedBidderTeam.value,
         bid_tricks: selectedBidTricks.value ?? undefined,
         bid_suit: selectedBidSuit.value ?? undefined,
         bid_key: selectedBidKey.value,
-        tricks_won: {
-            [selectedBidderTeam.value]: bidderTricksWon.value ?? 0,
-            ...(opponentTeam ? { [opponentTeam.key]: opponentTricks } : {}),
-        },
-        bid_made: previewScores.value?.bid_made,
     };
 
-    emit("save", roundData, previewScores.value);
+    emit("save", roundData);
 }
-
-// Reset when bid changes
-watch(selectedBidKey, () => {
-    bidderTricksWon.value = null;
-});
 </script>
 
 <style scoped>
-.five-hundred-round-entry table {
+.five-hundred-bid-entry table {
     border-spacing: 2px;
 }
 </style>

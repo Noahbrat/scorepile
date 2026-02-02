@@ -209,6 +209,8 @@ export interface GamePlayer {
 // Round
 // =====================================================
 
+export type RoundStatus = 'bidding' | 'playing' | 'scoring' | 'completed';
+
 export interface Round {
     id: number;
     game_id: number;
@@ -216,6 +218,7 @@ export interface Round {
     name?: string;
     dealer_game_player_id?: number | null;
     round_data?: RoundData | null;
+    status: RoundStatus;
     created?: string;
     modified?: string;
     scores?: Score[];
