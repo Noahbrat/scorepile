@@ -49,6 +49,7 @@ const mockScoringConfig: ScoringConfig = {
 const defaultGameConfig: Record<string, unknown> = {
     misere_enabled: true,
     open_misere_enabled: true,
+    min_bid: 7,
 };
 
 function mountComponent(overrides: Partial<{
@@ -78,21 +79,26 @@ describe("FiveHundredBidEntry", () => {
         vi.clearAllMocks();
     });
 
-    it("renders team selection buttons", () => {
+    it("renders player selection buttons", () => {
         const wrapper = mountComponent();
 
-        expect(wrapper.text()).toContain("Alice & Bob");
-        expect(wrapper.text()).toContain("Carol & Dave");
-        expect(wrapper.text()).toContain("Bidding Team");
+        expect(wrapper.text()).toContain("Alice");
+        expect(wrapper.text()).toContain("Bob");
+        expect(wrapper.text()).toContain("Carol");
+        expect(wrapper.text()).toContain("Dave");
+        expect(wrapper.text()).toContain("Who won the bid?");
     });
 
-    it("renders the Avondale bid grid", () => {
+    it("renders the Avondale bid grid starting at min bid", () => {
         const wrapper = mountComponent();
 
         const table = wrapper.find("table");
         expect(table.exists()).toBe(true);
-        expect(wrapper.text()).toContain("40");
-        expect(wrapper.text()).toContain("520");
+        // Min bid is 7, so grid should have 4 rows (7-10), not 5
+        const rows = table.findAll("tbody tr");
+        expect(rows.length).toBe(4);
+        expect(wrapper.text()).toContain("140"); // 7♠
+        expect(wrapper.text()).toContain("520"); // 10 NT
     });
 
     it("has a Start Round button instead of Save Round", () => {
@@ -117,16 +123,16 @@ describe("FiveHundredBidEntry", () => {
         expect(startButton!.attributes("disabled")).toBeDefined();
     });
 
-    it("enables Start Round after selecting team and bid", async () => {
+    it("enables Start Round after selecting player and bid", async () => {
         const wrapper = mountComponent();
 
-        // Select team
-        const teamButtons = wrapper.findAll(".five-hundred-bid-entry > div:first-child button");
-        await teamButtons[0].trigger("click");
+        // Select player (Alice = first button in the bidder section)
+        const playerButtons = wrapper.findAll(".five-hundred-bid-entry > div:first-child button");
+        await playerButtons[0].trigger("click"); // Alice
 
         // Select bid
         const bidButtons = wrapper.findAll("table button");
-        await bidButtons[0].trigger("click"); // 6 spades
+        await bidButtons[0].trigger("click"); // first bid in grid
         await flushPromises();
 
         const startButton = wrapper.findAll("button").find(b => b.text().includes("Start Round"));
@@ -134,16 +140,17 @@ describe("FiveHundredBidEntry", () => {
         expect(startButton!.attributes("disabled")).toBeUndefined();
     });
 
-    it("emits save with bid-only data (no tricks_won)", async () => {
+    it("emits save with bidder player and team (no tricks_won)", async () => {
         const wrapper = mountComponent();
 
-        // Select team
-        const teamButtons = wrapper.findAll(".five-hundred-bid-entry > div:first-child button");
-        await teamButtons[0].trigger("click");
+        // Select player (Alice, team 1, game_player_id 10)
+        const playerButtons = wrapper.findAll(".five-hundred-bid-entry > div:first-child button");
+        await playerButtons[0].trigger("click");
 
-        // Select bid: 7 hearts
+        // Select bid: 7 hearts — with min_bid default 7, row 0 is 7 tricks
+        // Row 0 = 7 tricks: spades(0), clubs(1), diamonds(2), hearts(3)
         const bidButtons = wrapper.findAll("table button");
-        await bidButtons[8].trigger("click"); // 7_hearts
+        await bidButtons[3].trigger("click"); // 7_hearts
         await flushPromises();
 
         // Click Start Round
@@ -156,6 +163,7 @@ describe("FiveHundredBidEntry", () => {
         expect(emitted![0]).toHaveLength(1);
         const roundData = emitted![0][0] as Record<string, unknown>;
         expect(roundData.bidder_team).toBe("team_1");
+        expect(roundData.bidder_game_player_id).toBe(10); // Alice's game_player id
         expect(roundData.bid_key).toBe("7_hearts");
         expect(roundData.bid_tricks).toBe(7);
         expect(roundData.bid_suit).toBe("hearts");

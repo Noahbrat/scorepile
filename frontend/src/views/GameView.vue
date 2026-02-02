@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Toast />
+        <Toast position="bottom-right" />
 
         <!-- Loading State -->
         <div v-if="loading && !game" class="text-center py-12">
@@ -132,6 +132,40 @@
                         Assign players to teams before starting. Drag or tap to move players between teams.
                     </p>
 
+                    <!-- Seating Order -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Seating Order (clockwise, for dealer rotation)</label>
+                        <div class="flex flex-wrap gap-2">
+                            <div
+                                v-for="(gp, idx) in seatingOrder"
+                                :key="gp.id"
+                                class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800"
+                            >
+                                <Button
+                                    icon="pi pi-chevron-left"
+                                    severity="secondary"
+                                    text
+                                    rounded
+                                    size="small"
+                                    :disabled="idx === 0"
+                                    @click="moveSeat(idx, -1)"
+                                    class="!w-6 !h-6"
+                                />
+                                <span class="font-medium text-sm px-1">{{ gp.player?.name }}</span>
+                                <Button
+                                    icon="pi pi-chevron-right"
+                                    severity="secondary"
+                                    text
+                                    rounded
+                                    size="small"
+                                    :disabled="idx === seatingOrder.length - 1"
+                                    @click="moveSeat(idx, 1)"
+                                    class="!w-6 !h-6"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div
                             v-for="teamNum in teamCount"
@@ -139,7 +173,12 @@
                             class="border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg p-3 min-h-32"
                             :class="{ 'border-primary': true }"
                         >
-                            <div class="text-sm font-semibold mb-2 text-center">Team {{ teamNum }}</div>
+                            <InputText
+                                v-model="teamNameDraft[teamNum]"
+                                :placeholder="`Team ${teamNum}`"
+                                class="w-full text-center font-semibold text-sm mb-2"
+                                :pt="{ root: { class: '!bg-transparent !border-0 !border-b !border-surface-300 dark:!border-surface-600 !rounded-none !shadow-none text-center' } }"
+                            />
                             <div class="space-y-2">
                                 <div
                                     v-for="gp in gamePlayers.filter(p => teamDraft[p.player_id] === teamNum)"
@@ -521,6 +560,7 @@ import Toast from "primevue/toast";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
 import Tag from "primevue/tag";
 import FiveHundredRoundEntry from "@/components/FiveHundredRoundEntry.vue";
 import FiveHundredBidEntry from "@/components/FiveHundredBidEntry.vue";
@@ -550,6 +590,8 @@ const cancellingRound = ref(false);
 const savingTeams = ref(false);
 const editingTeams = ref(false);
 const teamDraft = reactive<Record<number, number>>({});
+const teamNameDraft = reactive<Record<number, string>>({});
+const seatingOrder = ref<GamePlayer[]>([]);
 const currentDealerId = ref<number | null>(null);
 
 // Local score edits: key = `${roundId}-${gamePlayerId}`, value = points
@@ -611,6 +653,37 @@ function initTeamDraft() {
             teamDraft[gp.player_id] = (i % teamCount.value) + 1;
         }
     }
+
+    // Init team names from game_config or defaults
+    const savedNames = (game.value?.game_config?.team_names ?? {}) as Record<string, string>;
+    for (let i = 1; i <= teamCount.value; i++) {
+        teamNameDraft[i] = savedNames[String(i)] || `Team ${i}`;
+    }
+
+    // Init seating order — use saved order or default to game_players order
+    const savedOrder = (game.value?.game_config?.seating_order ?? []) as number[];
+    if (savedOrder.length > 0) {
+        const ordered: GamePlayer[] = [];
+        for (const gpId of savedOrder) {
+            const gp = gamePlayers.value.find(p => p.id === gpId);
+            if (gp) ordered.push(gp);
+        }
+        // Add any players not in the saved order
+        for (const gp of gamePlayers.value) {
+            if (!ordered.find(o => o.id === gp.id)) ordered.push(gp);
+        }
+        seatingOrder.value = ordered;
+    } else {
+        seatingOrder.value = [...gamePlayers.value];
+    }
+}
+
+function moveSeat(index: number, direction: number) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= seatingOrder.value.length) return;
+    const arr = [...seatingOrder.value];
+    [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+    seatingOrder.value = arr;
 }
 
 function startEditingTeams() {
@@ -633,7 +706,14 @@ async function saveTeams() {
             teams[String(gp.player_id)] = teamDraft[gp.player_id];
         }
 
-        const response = await gamesApi.assignTeams(game.value.id, teams);
+        // Build team names and seating order to save in game_config
+        const teamNames: Record<string, string> = {};
+        for (let i = 1; i <= teamCount.value; i++) {
+            teamNames[String(i)] = teamNameDraft[i] || `Team ${i}`;
+        }
+        const seatingOrderIds = seatingOrder.value.map(gp => gp.id);
+
+        const response = await gamesApi.assignTeams(game.value.id, teams, teamNames, seatingOrderIds);
         game.value = response.data.data;
         editingTeams.value = false;
         toast.add({ severity: "success", summary: "Teams Saved", detail: "Team assignments updated", life: 3000 });
@@ -697,11 +777,14 @@ const teamInfo = computed<TeamSummary[]>(() => {
         // Since team members share same score, use first player's total (avoid double counting)
         const teamTotal = playerTotals.value[players[0]?.id] ?? 0;
 
+        const savedNames = (game.value?.game_config?.team_names ?? {}) as Record<string, string>;
+        const customName = savedNames[String(num)];
+
         return {
             number: num,
             key: `team_${num}`,
-            label,
-            shortLabel: `Team ${num}`,
+            label: customName && customName !== `Team ${num}` ? customName : label,
+            shortLabel: customName || `Team ${num}`,
             players,
             total: teamTotal,
         };
@@ -725,6 +808,23 @@ const trackDealer = computed(() => scoringConfig.value?.track_dealer ?? false);
  * - If there are existing rounds with a dealer, advance from the last one
  * - Otherwise, default to the first player (user can change)
  */
+// Seating-aware player order for dealer rotation
+const playerOrder = computed<GamePlayer[]>(() => {
+    const savedOrder = (game.value?.game_config?.seating_order ?? []) as number[];
+    if (savedOrder.length > 0) {
+        const ordered: GamePlayer[] = [];
+        for (const gpId of savedOrder) {
+            const gp = gamePlayers.value.find(p => p.id === gpId);
+            if (gp) ordered.push(gp);
+        }
+        for (const gp of gamePlayers.value) {
+            if (!ordered.find(o => o.id === gp.id)) ordered.push(gp);
+        }
+        return ordered;
+    }
+    return gamePlayers.value;
+});
+
 function initDealer() {
     if (!trackDealer.value || gamePlayers.value.length === 0) return;
 
@@ -734,18 +834,19 @@ function initDealer() {
         : null;
 
     if (lastRound?.dealer_game_player_id) {
-        // Advance to next player
+        // Advance to next player using seating order
         currentDealerId.value = getNextDealer(lastRound.dealer_game_player_id);
     } else {
-        // Default to first player
-        currentDealerId.value = gamePlayers.value[0]?.id ?? null;
+        // Default to first player in seating order
+        currentDealerId.value = playerOrder.value[0]?.id ?? null;
     }
 }
 
 function getNextDealer(currentId: number): number {
-    const idx = gamePlayers.value.findIndex(gp => gp.id === currentId);
-    const nextIdx = (idx + 1) % gamePlayers.value.length;
-    return gamePlayers.value[nextIdx].id;
+    const order = playerOrder.value;
+    const idx = order.findIndex(gp => gp.id === currentId);
+    const nextIdx = (idx + 1) % order.length;
+    return order[nextIdx].id;
 }
 
 function getDealerName(dealerGamePlayerId: number | null | undefined): string | null {
@@ -773,10 +874,20 @@ function formatBid(roundData: RoundData): string {
     return `${tricks}${suitSymbols[suit] ?? suit}`;
 }
 
-function bidderTeamLabel(roundData: RoundData): string {
+function bidderLabel(roundData: RoundData): string {
+    // Show player name if available, fall back to team label
+    if (roundData.bidder_game_player_id) {
+        const gp = gamePlayers.value.find(p => p.id === roundData.bidder_game_player_id);
+        if (gp?.player?.name) return gp.player.name;
+    }
     if (!roundData.bidder_team) return "";
     const team = teamInfo.value.find(t => t.key === roundData.bidder_team);
     return team?.shortLabel ?? roundData.bidder_team as string;
+}
+
+// Legacy compat alias
+function bidderTeamLabel(roundData: RoundData): string {
+    return bidderLabel(roundData);
 }
 
 function getBidValue(roundData: RoundData): number {

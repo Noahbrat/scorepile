@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Toast />
+        <Toast position="bottom-right" />
 
         <!-- Header -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -124,19 +124,6 @@
         >
             <form @submit.prevent="handleCreate">
                 <div class="mb-4">
-                    <label for="game-name" class="block text-sm font-medium mb-2">
-                        Game Name <span class="text-red-500">*</span>
-                    </label>
-                    <InputText
-                        id="game-name"
-                        v-model="form.name"
-                        class="w-full"
-                        placeholder="e.g. Friday Night Cribbage"
-                        required
-                    />
-                </div>
-
-                <div class="mb-4">
                     <label for="game-type" class="block text-sm font-medium mb-2">Game Type</label>
                     <Select
                         id="game-type"
@@ -164,30 +151,6 @@
                         class="w-full"
                         display="chip"
                     />
-                </div>
-
-                <!-- Team Assignment (for team-based games) -->
-                <div v-if="teamsEnabled && form.player_ids && form.player_ids.length >= 2" class="mb-4">
-                    <label class="block text-sm font-medium mb-2">Team Assignment</label>
-                    <div class="space-y-2">
-                        <div
-                            v-for="playerId in form.player_ids"
-                            :key="playerId"
-                            class="flex items-center gap-3"
-                        >
-                            <span class="text-sm flex-1">
-                                {{ playersStore.players.find(p => p.id === playerId)?.name ?? `Player ${playerId}` }}
-                            </span>
-                            <Select
-                                :modelValue="form.team_assignments?.[playerId] ?? 1"
-                                @update:modelValue="(v: number) => { if (form.team_assignments) form.team_assignments[playerId] = v; }"
-                                :options="[{ label: 'Team 1', value: 1 }, { label: 'Team 2', value: 2 }]"
-                                optionLabel="label"
-                                optionValue="value"
-                                class="w-32"
-                            />
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Game Config Options (from scoring engine) -->
@@ -311,8 +274,6 @@ const selectedGameType = computed<GameType | null>(() => {
 
 const scoringConfig = computed<ScoringConfig | null>(() => selectedGameType.value?.scoring_config ?? null);
 
-const teamsEnabled = computed(() => scoringConfig.value?.teams?.enabled ?? false);
-
 const gameConfigOptions = computed(() => scoringConfig.value?.options ?? []);
 
 // Reset team assignments and game config when game type changes
@@ -361,17 +322,23 @@ function confirmDelete(game: Game) {
 
 // ── CRUD handlers ───────────────────────────────────────────────
 
-async function handleCreate() {
-    if (!form.name.trim()) {
-        toast.add({ severity: "warn", summary: "Validation", detail: "Game name is required", life: 3000 });
-        return;
+function generateGameName(): string {
+    const gameType = selectedGameType.value;
+    const datePart = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (gameType) {
+        return `${gameType.name} — ${datePart}`;
     }
+    return `Game — ${datePart}`;
+}
+
+async function handleCreate() {
     if (!form.player_ids || form.player_ids.length < 2) {
         toast.add({ severity: "warn", summary: "Validation", detail: "Select at least 2 players", life: 3000 });
         return;
     }
 
     try {
+        form.name = generateGameName();
         const game = await gamesStore.createGame({ ...form });
         toast.add({ severity: "success", summary: "Created", detail: "Game started!", life: 3000 });
         dialogVisible.value = false;

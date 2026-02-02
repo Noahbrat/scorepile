@@ -331,10 +331,10 @@ export const gamesApi = {
             },
         ),
 
-    assignTeams: (id: number, teams: Record<string, number>) =>
+    assignTeams: (id: number, teams: Record<string, number>, teamNames?: Record<string, string>, seatingOrder?: number[]) =>
         api.post<ApiResponse<Game>>(
             `/games/${id}/assign-teams.json`,
-            { teams },
+            { teams, team_names: teamNames, seating_order: seatingOrder },
         ),
 
     completeRound: (gameId: number, roundId: number, tricksWon: Record<string, number>) =>

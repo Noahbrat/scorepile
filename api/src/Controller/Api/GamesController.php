@@ -162,6 +162,21 @@ class GamesController extends AppController
         $data = $this->request->getData();
         $data['user_id'] = $user->id;
 
+        // Auto-generate name if not provided
+        if (empty($data['name'])) {
+            $gameTypeName = 'Game';
+            if (!empty($data['game_type_id'])) {
+                $gameTypesTable = $this->getTableLocator()->get('GameTypes');
+                try {
+                    $gameType = $gameTypesTable->get($data['game_type_id']);
+                    $gameTypeName = $gameType->name;
+                } catch (\Exception $e) {
+                    // Fall back to generic name
+                }
+            }
+            $data['name'] = $gameTypeName . ' — ' . date('M j, Y');
+        }
+
         // Extract player_ids and team_assignments before patching (not direct entity fields)
         $playerIds = $data['player_ids'] ?? [];
         $teamAssignments = $data['team_assignments'] ?? [];
@@ -317,6 +332,21 @@ class GamesController extends AppController
                 $gamePlayersTable->save($gp);
             }
         }
+
+        // Save team names and seating order to game_config
+        $teamNames = $this->request->getData('team_names');
+        $seatingOrder = $this->request->getData('seating_order');
+        $gameConfig = $game->game_config ?? [];
+
+        if (!empty($teamNames) && is_array($teamNames)) {
+            $gameConfig['team_names'] = $teamNames;
+        }
+        if (!empty($seatingOrder) && is_array($seatingOrder)) {
+            $gameConfig['seating_order'] = array_map('intval', $seatingOrder);
+        }
+
+        $game->game_config = $gameConfig;
+        $this->Games->save($game);
 
         // Reload with fresh data
         $game = $this->Games->get($id, contain: [

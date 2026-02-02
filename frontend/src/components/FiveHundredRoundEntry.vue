@@ -32,7 +32,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="tricks in [6, 7, 8, 9, 10]" :key="tricks">
+                        <tr v-for="tricks in trickRange" :key="tricks">
                             <td class="p-1 font-medium text-muted-color">{{ tricks }}</td>
                             <td v-for="suit in suits" :key="suit.key" class="p-0.5">
                                 <button
@@ -180,6 +180,13 @@ const suits = [
     { key: "hearts", symbol: "\u2665", color: "text-red-600 dark:text-red-400" },
     { key: "no_trump", symbol: "NT", color: "text-blue-600 dark:text-blue-400" },
 ];
+
+const minBid = computed(() => Number(props.gameConfig.min_bid ?? props.scoringConfig.options?.find(o => o.key === "min_bid")?.default ?? 6));
+const trickRange = computed(() => {
+    const range: number[] = [];
+    for (let i = minBid.value; i <= 10; i++) range.push(i);
+    return range;
+});
 
 const misereEnabled = computed(() => (props.gameConfig.misere_enabled ?? props.scoringConfig.options?.find(o => o.key === "misere_enabled")?.default ?? false) as boolean);
 const openMisereEnabled = computed(() => (props.gameConfig.open_misere_enabled ?? props.scoringConfig.options?.find(o => o.key === "open_misere_enabled")?.default ?? false) as boolean);

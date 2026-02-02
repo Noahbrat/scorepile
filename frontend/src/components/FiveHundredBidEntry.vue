@@ -1,18 +1,21 @@
 <template>
     <div class="five-hundred-bid-entry">
-        <!-- Bidding Team -->
+        <!-- Bidding Player -->
         <div class="mb-4">
-            <label class="block text-sm font-medium mb-2">Bidding Team</label>
-            <div class="flex gap-2">
+            <label class="block text-sm font-medium mb-2">Who won the bid?</label>
+            <div class="flex flex-wrap gap-2">
                 <Button
-                    v-for="team in teams"
-                    :key="team.key"
-                    :label="team.label"
-                    :severity="selectedBidderTeam === team.key ? 'primary' : 'secondary'"
-                    :outlined="selectedBidderTeam !== team.key"
+                    v-for="gp in gamePlayers"
+                    :key="gp.id"
+                    :label="gp.player?.name ?? `Player ${gp.player_id}`"
+                    :severity="selectedBidderId === gp.id ? 'primary' : 'secondary'"
+                    :outlined="selectedBidderId !== gp.id"
                     class="flex-1"
-                    @click="selectedBidderTeam = team.key"
+                    @click="selectBidder(gp)"
                 />
+            </div>
+            <div v-if="selectedBidderTeam" class="text-xs text-muted-color mt-1">
+                Team: {{ teams.find(t => t.key === selectedBidderTeam)?.label ?? selectedBidderTeam }}
             </div>
         </div>
 
@@ -32,7 +35,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="tricks in [6, 7, 8, 9, 10]" :key="tricks">
+                        <tr v-for="tricks in trickRange" :key="tricks">
                             <td class="p-1 font-medium text-muted-color">{{ tricks }}</td>
                             <td v-for="suit in suits" :key="suit.key" class="p-0.5">
                                 <button
@@ -109,6 +112,13 @@ const suits = [
     { key: "no_trump", symbol: "NT", color: "text-blue-600 dark:text-blue-400" },
 ];
 
+const minBid = computed(() => Number(props.gameConfig.min_bid ?? props.scoringConfig.options?.find(o => o.key === "min_bid")?.default ?? 6));
+const trickRange = computed(() => {
+    const range: number[] = [];
+    for (let i = minBid.value; i <= 10; i++) range.push(i);
+    return range;
+});
+
 const misereEnabled = computed(() => (props.gameConfig.misere_enabled ?? props.scoringConfig.options?.find(o => o.key === "misere_enabled")?.default ?? false) as boolean);
 const openMisereEnabled = computed(() => (props.gameConfig.open_misere_enabled ?? props.scoringConfig.options?.find(o => o.key === "open_misere_enabled")?.default ?? false) as boolean);
 
@@ -131,10 +141,17 @@ const teams = computed(() => {
 
 // ── State ────────────────────────────────────────────────────────
 
+const selectedBidderId = ref<number | null>(null);
 const selectedBidderTeam = ref<string | null>(null);
 const selectedBidKey = ref<string | null>(null);
 const selectedBidTricks = ref<number | null>(null);
 const selectedBidSuit = ref<string | null>(null);
+
+function selectBidder(gp: GamePlayer) {
+    selectedBidderId.value = gp.id;
+    const teamNum = gp.team ?? 0;
+    selectedBidderTeam.value = `team_${teamNum}`;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -170,6 +187,7 @@ function handleSave() {
 
     const roundData: RoundData = {
         bidder_team: selectedBidderTeam.value,
+        bidder_game_player_id: selectedBidderId.value ?? undefined,
         bid_tricks: selectedBidTricks.value ?? undefined,
         bid_suit: selectedBidSuit.value ?? undefined,
         bid_key: selectedBidKey.value,
