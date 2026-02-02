@@ -18,7 +18,7 @@
         </div>
 
         <!-- Tricks Won -->
-        <div v-if="!isMisereBid" class="mb-4">
+        <div v-if="!isMisereBid" class="mb-5">
             <label class="block text-sm font-medium mb-2">Tricks Won by Bidding Team</label>
             <div class="flex items-center gap-4">
                 <InputNumber
@@ -40,21 +40,21 @@
         </div>
 
         <!-- Misère tricks (0 or not) -->
-        <div v-if="isMisereBid" class="mb-4">
+        <div v-if="isMisereBid" class="mb-5">
             <label class="block text-sm font-medium mb-2">Did the bidder take any tricks?</label>
-            <div class="flex gap-2">
+            <div class="flex gap-3">
                 <Button
                     label="No tricks (success)"
                     :severity="bidderTricksWon === 0 ? 'success' : 'secondary'"
                     :outlined="bidderTricksWon !== 0"
-                    class="flex-1"
+                    class="flex-1 !min-h-[48px] !text-base"
                     @click="bidderTricksWon = 0"
                 />
                 <Button
                     label="Took tricks (failed)"
                     :severity="bidderTricksWon !== null && bidderTricksWon > 0 ? 'danger' : 'secondary'"
                     :outlined="bidderTricksWon === null || bidderTricksWon === 0"
-                    class="flex-1"
+                    class="flex-1 !min-h-[48px] !text-base"
                     @click="bidderTricksWon = 1"
                 />
             </div>
