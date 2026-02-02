@@ -229,46 +229,42 @@
 
             <!-- Engine Score Table (team-based, e.g., 500) -->
             <template v-if="hasEngine && isTeamGame && !needsTeamSetup && !editingTeams">
-                <!-- Team totals -->
-                <div class="flex gap-4 mb-4">
-                    <div
-                        v-for="team in teamInfo"
-                        :key="team.number"
-                        class="flex-1 border border-surface-200 dark:border-surface-700 rounded-lg p-3 text-center relative"
-                    >
-                        <div class="text-sm text-muted-color mb-1">{{ team.label }}</div>
-                        <div class="text-2xl font-bold" :class="team.total >= 0 ? '' : 'text-red-600 dark:text-red-400'">
-                            {{ team.total }}
-                        </div>
-                    </div>
+                <!-- Edit teams button -->
+                <div v-if="game?.status === 'active'" class="flex justify-end mb-2">
                     <Button
-                        v-if="game?.status === 'active'"
                         icon="pi pi-pencil"
+                        label="Edit Teams"
                         severity="secondary"
                         text
-                        rounded
                         size="small"
-                        class="self-center"
-                        v-tooltip.top="'Edit teams'"
                         @click="startEditingTeams"
                     />
                 </div>
 
-                <!-- Round history table -->
+                <!-- Split scoreboard table -->
                 <div class="overflow-x-auto -mx-4 sm:mx-0">
                     <table class="w-full border-collapse min-w-0">
                         <thead>
-                            <tr class="border-b-2 border-surface-300 dark:border-surface-600">
-                                <th class="p-2 text-left text-sm font-semibold min-w-12">#</th>
-                                <th class="p-2 text-left text-sm font-semibold">Bid</th>
-                                <th class="p-2 text-center text-sm font-semibold">Result</th>
+                            <!-- Team name header row -->
+                            <tr class="border-b border-surface-200 dark:border-surface-600">
+                                <th class="p-1" :style="{ width: '2rem' }"></th>
                                 <th
                                     v-for="team in teamInfo"
                                     :key="team.number"
-                                    class="p-2 text-center text-sm font-semibold min-w-20"
+                                    :colspan="3"
+                                    class="p-2 text-center font-bold text-base border-l border-surface-200 dark:border-surface-600"
                                 >
                                     {{ team.shortLabel }}
                                 </th>
+                            </tr>
+                            <!-- Sub-headers: Bid / Result / Score per team -->
+                            <tr class="border-b-2 border-surface-300 dark:border-surface-600">
+                                <th class="p-1.5 text-left text-xs text-muted-color font-medium">#</th>
+                                <template v-for="team in teamInfo" :key="team.number">
+                                    <th class="p-1.5 text-left text-xs text-muted-color font-medium border-l border-surface-200 dark:border-surface-600">Bid</th>
+                                    <th class="p-1.5 text-center text-xs text-muted-color font-medium">Result</th>
+                                    <th class="p-1.5 text-right text-xs text-muted-color font-medium">Score</th>
+                                </template>
                             </tr>
                         </thead>
                         <tbody>
@@ -277,63 +273,73 @@
                                 :key="round.id"
                                 class="border-b border-surface-200 dark:border-surface-700"
                             >
-                                <td class="p-2 text-sm text-muted-color">
+                                <!-- Round number + dealer -->
+                                <td class="p-1.5 text-xs text-muted-color align-top">
                                     {{ round.round_number }}
                                     <span
                                         v-if="trackDealer && getDealerName(round.dealer_game_player_id)"
-                                        class="block text-xs"
+                                        class="block text-[10px] leading-tight"
                                         :title="`Dealer: ${getDealerName(round.dealer_game_player_id)}`"
-                                    >🃏 {{ getDealerName(round.dealer_game_player_id) }}</span>
+                                    >🃏{{ getDealerName(round.dealer_game_player_id) }}</span>
                                 </td>
-                                <td class="p-2 text-sm">
-                                    <template v-if="round.round_data?.bid_key">
-                                        <span class="font-medium">{{ formatBid(round.round_data) }}</span>
-                                        <span class="text-muted-color text-xs ml-1">
-                                            ({{ bidderTeamLabel(round.round_data) }})
-                                        </span>
-                                    </template>
-                                    <span v-else class="text-muted-color">—</span>
-                                </td>
-                                <td class="p-2 text-center text-sm">
-                                    <Tag
-                                        v-if="round.status === 'playing'"
-                                        value="In Progress"
-                                        severity="warn"
-                                        class="text-xs"
-                                    />
-                                    <Tag
-                                        v-else-if="round.round_data?.bid_made !== undefined"
-                                        :value="round.round_data.bid_made ? 'Made' : 'Failed'"
-                                        :severity="round.round_data.bid_made ? 'success' : 'danger'"
-                                        class="text-xs"
-                                    />
-                                </td>
-                                <td
-                                    v-for="team in teamInfo"
-                                    :key="team.number"
-                                    class="p-2 text-center text-sm font-medium"
-                                >
-                                    <template v-if="round.status === 'completed'">
-                                        <span :class="getRoundTeamScore(round, team.number) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                                            {{ getRoundTeamScore(round, team.number) >= 0 ? '+' : '' }}{{ getRoundTeamScore(round, team.number) }}
-                                        </span>
-                                    </template>
-                                    <template v-else>
-                                        <span class="text-muted-color">—</span>
-                                    </template>
-                                </td>
+
+                                <!-- Per-team columns: Bid / Result / Score -->
+                                <template v-for="team in teamInfo" :key="team.number">
+                                    <!-- Bid (only on bidding team's side) -->
+                                    <td class="p-1.5 text-sm align-top border-l border-surface-200 dark:border-surface-600">
+                                        <template v-if="roundBidderTeamKey(round) === team.key && round.round_data?.bid_key">
+                                            <span class="font-medium">{{ formatBid(round.round_data!) }}</span>
+                                            <span class="block text-xs text-muted-color">{{ bidderLabel(round.round_data!) }}</span>
+                                        </template>
+                                    </td>
+                                    <!-- Result (only on bidding team's side) -->
+                                    <td class="p-1.5 text-center text-sm align-top">
+                                        <template v-if="roundBidderTeamKey(round) === team.key">
+                                            <Tag
+                                                v-if="round.status === 'playing'"
+                                                value="Playing"
+                                                severity="warn"
+                                                class="text-xs"
+                                            />
+                                            <Tag
+                                                v-else-if="round.round_data?.bid_made !== undefined"
+                                                :value="round.round_data.bid_made ? 'Made' : 'Set'"
+                                                :severity="round.round_data.bid_made ? 'success' : 'danger'"
+                                                class="text-xs"
+                                            />
+                                        </template>
+                                    </td>
+                                    <!-- Score -->
+                                    <td class="p-1.5 text-right text-sm font-medium align-top">
+                                        <template v-if="round.status === 'completed'">
+                                            <span :class="getRoundTeamScore(round, team.number) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                                                {{ getRoundTeamScore(round, team.number) >= 0 ? '+' : '' }}{{ getRoundTeamScore(round, team.number) }}
+                                            </span>
+                                        </template>
+                                        <template v-else>
+                                            <span class="text-muted-color">—</span>
+                                        </template>
+                                    </td>
+                                </template>
                             </tr>
                         </tbody>
                         <tfoot>
                             <tr class="border-t-2 border-surface-300 dark:border-surface-600">
-                                <td colspan="3" class="p-2 font-bold text-sm">Total</td>
-                                <td
-                                    v-for="team in teamInfo"
-                                    :key="team.number"
-                                    class="p-2 text-center font-bold text-lg"
-                                >
-                                    {{ team.total }}
-                                </td>
+                                <td class="p-2"></td>
+                                <template v-for="team in teamInfo" :key="team.number">
+                                    <td
+                                        colspan="3"
+                                        class="p-3 text-center border-l border-surface-200 dark:border-surface-600"
+                                    >
+                                        <div class="text-xs text-muted-color uppercase tracking-wide">{{ team.shortLabel }}</div>
+                                        <div
+                                            class="text-3xl font-black"
+                                            :class="team.total >= 0 ? '' : 'text-red-600 dark:text-red-400'"
+                                        >
+                                            {{ team.total }}
+                                        </div>
+                                    </td>
+                                </template>
                             </tr>
                         </tfoot>
                     </table>
@@ -790,6 +796,10 @@ const teamInfo = computed<TeamSummary[]>(() => {
         };
     });
 });
+
+function roundBidderTeamKey(round: Round): string | null {
+    return (round.round_data?.bidder_team as string) ?? null;
+}
 
 function getRoundTeamScore(round: Round, teamNumber: number): number {
     const teamPlayers = gamePlayers.value.filter(gp => gp.team === teamNumber);
