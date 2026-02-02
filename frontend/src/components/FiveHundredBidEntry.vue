@@ -56,7 +56,7 @@
                     :class="bidButtonClass('misere')"
                     @click="selectBid(null, null, 'misere')"
                 >
-                    Misère (250)
+                    Misère / Nullo (250)
                 </button>
                 <button
                     v-if="openMisereEnabled"
@@ -64,7 +64,7 @@
                     :class="bidButtonClass('open_misere')"
                     @click="selectBid(null, null, 'open_misere')"
                 >
-                    Open Misère (500)
+                    Open Misère / Nullo (500)
                 </button>
             </div>
         </div>

@@ -34,15 +34,15 @@ class SeedSystemGameTypes extends AbstractMigration
                 ],
                 [
                     'key' => 'misere_enabled',
-                    'label' => 'Allow Misère',
+                    'label' => 'Allow Misère / Nullo',
                     'type' => 'boolean',
-                    'default' => true,
+                    'default' => false,
                 ],
                 [
                     'key' => 'open_misere_enabled',
-                    'label' => 'Allow Open Misère',
+                    'label' => 'Allow Open Misère / Nullo',
                     'type' => 'boolean',
-                    'default' => true,
+                    'default' => false,
                 ],
             ],
             'bid_table' => [

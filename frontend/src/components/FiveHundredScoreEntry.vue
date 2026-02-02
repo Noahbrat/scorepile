@@ -138,8 +138,8 @@ const isMisereBid = computed(() =>
 const formattedBid = computed(() => {
     const key = props.roundData.bid_key;
     if (!key) return "—";
-    if (key === "misere") return "Misère";
-    if (key === "open_misere") return "Open Misère";
+    if (key === "misere") return "Misère / Nullo";
+    if (key === "open_misere") return "Open Misère / Nullo";
     const tricks = props.roundData.bid_tricks ?? "";
     const suit = props.roundData.bid_suit ?? "";
     return `${tricks}${suitSymbols[suit] ?? suit}`;
@@ -169,7 +169,9 @@ const bidderTeamLabel = computed(() => {
 
 // ── State ────────────────────────────────────────────────────────
 
-const bidderTricksWon = ref<number | null>(null);
+const bidderTricksWon = ref<number | null>(
+    isMisereBid.value ? 0 : (props.roundData.bid_tricks ?? 7)
+);
 
 // ── Score calculation (client-side preview) ──────────────────────
 

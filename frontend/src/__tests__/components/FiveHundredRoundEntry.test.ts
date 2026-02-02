@@ -101,8 +101,8 @@ describe("FiveHundredRoundEntry", () => {
     it("renders misère buttons when enabled", () => {
         const wrapper = mountComponent();
 
-        expect(wrapper.text()).toContain("Misère (250)");
-        expect(wrapper.text()).toContain("Open Misère (500)");
+        expect(wrapper.text()).toContain("Misère / Nullo (250)");
+        expect(wrapper.text()).toContain("Open Misère / Nullo (500)");
     });
 
     it("hides misère buttons when disabled", () => {
@@ -110,8 +110,8 @@ describe("FiveHundredRoundEntry", () => {
             gameConfig: { misere_enabled: false, open_misere_enabled: false },
         });
 
-        expect(wrapper.text()).not.toContain("Misère (250)");
-        expect(wrapper.text()).not.toContain("Open Misère (500)");
+        expect(wrapper.text()).not.toContain("Misère / Nullo (250)");
+        expect(wrapper.text()).not.toContain("Open Misère / Nullo (500)");
     });
 
     it("selects a bid when grid button is clicked", async () => {
@@ -150,7 +150,7 @@ describe("FiveHundredRoundEntry", () => {
         // Click misère button
         const specialBids = wrapper.findAll(".five-hundred-round-entry > div:nth-child(2) > div.flex.gap-2.mt-2 button");
         // Find the misère button
-        const misereButton = wrapper.findAll("button").find(b => b.text().includes("Misère (250)"));
+        const misereButton = wrapper.findAll("button").find(b => b.text().includes("Misère / Nullo (250)"));
         expect(misereButton).toBeTruthy();
 
         await misereButton!.trigger("click");

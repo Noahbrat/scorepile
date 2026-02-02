@@ -109,18 +109,19 @@ describe("FiveHundredScoreEntry", () => {
         expect(wrapper.text()).not.toContain("Save Round");
     });
 
-    it("disables Save Score when no tricks entered", () => {
+    it("defaults tricks won to bid amount and enables Save Score", () => {
         const wrapper = mountComponent();
 
         const saveButton = wrapper.findAll("button").find(b => b.text().includes("Save Score"));
         expect(saveButton).toBeTruthy();
-        expect(saveButton!.attributes("disabled")).toBeDefined();
+        // With default tricks = bid_tricks (7), score preview is visible, so Save is enabled
+        expect(saveButton!.attributes("disabled")).toBeUndefined();
     });
 
     it("displays misère bid summary correctly", () => {
         const wrapper = mountComponent({ roundData: misereBidRoundData });
 
-        expect(wrapper.text()).toContain("Misère");
+        expect(wrapper.text()).toContain("Misère / Nullo");
         expect(wrapper.text()).toContain("250 points");
     });
 });

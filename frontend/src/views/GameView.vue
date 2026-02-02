@@ -766,8 +766,8 @@ const suitSymbols: Record<string, string> = {
 
 function formatBid(roundData: RoundData): string {
     if (!roundData.bid_key) return "—";
-    if (roundData.bid_key === "misere") return "Misère";
-    if (roundData.bid_key === "open_misere") return "Open Misère";
+    if (roundData.bid_key === "misere") return "Misère / Nullo";
+    if (roundData.bid_key === "open_misere") return "Open Misère / Nullo";
     const tricks = roundData.bid_tricks ?? "";
     const suit = roundData.bid_suit ?? "";
     return `${tricks}${suitSymbols[suit] ?? suit}`;
