@@ -1,7 +1,7 @@
 <template>
     <div class="five-hundred-round-entry">
         <!-- Bidding Team -->
-        <div class="mb-4">
+        <div class="mb-5">
             <label class="block text-sm font-medium mb-2">Bidding Team</label>
             <div class="flex gap-2">
                 <Button
@@ -10,33 +10,33 @@
                     :label="team.label"
                     :severity="selectedBidderTeam === team.key ? 'primary' : 'secondary'"
                     :outlined="selectedBidderTeam !== team.key"
-                    class="flex-1"
+                    class="flex-1 !min-h-[44px] !text-base"
                     @click="selectedBidderTeam = team.key"
                 />
             </div>
         </div>
 
         <!-- Bid Selection Grid -->
-        <div class="mb-4">
+        <div class="mb-5">
             <label class="block text-sm font-medium mb-2">Bid</label>
 
             <!-- Avondale grid: rows = tricks (6-10), cols = suits -->
-            <div class="overflow-x-auto -mx-2 px-2">
-                <table class="w-full border-collapse text-center text-sm">
+            <div class="bid-grid">
+                <table class="w-full border-collapse text-center">
                     <thead>
                         <tr>
-                            <th class="p-1 text-xs text-muted-color"></th>
+                            <th class="p-1 text-sm text-muted-color"></th>
                             <th v-for="suit in suits" :key="suit.key" class="p-1">
-                                <span :class="suitColorClass(suit.key)">{{ suit.symbol }}</span>
+                                <span class="text-lg" :class="suitColorClass(suit.key)">{{ suit.symbol }}</span>
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="tricks in trickRange" :key="tricks">
-                            <td class="p-1 font-medium text-muted-color">{{ tricks }}</td>
-                            <td v-for="suit in suits" :key="suit.key" class="p-0.5">
+                            <td class="p-1 font-semibold text-muted-color text-sm">{{ tricks }}</td>
+                            <td v-for="suit in suits" :key="suit.key" class="p-1">
                                 <button
-                                    class="w-full py-1.5 px-1 rounded text-xs font-medium transition-colors"
+                                    class="bid-cell w-full rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                                     :class="bidButtonClass(`${tricks}_${suit.key}`)"
                                     @click="selectBid(tricks, suit.key, `${tricks}_${suit.key}`)"
                                 >
@@ -49,10 +49,10 @@
             </div>
 
             <!-- Special bids -->
-            <div class="flex gap-2 mt-2">
+            <div class="flex gap-2 mt-3">
                 <button
                     v-if="misereEnabled"
-                    class="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors"
+                    class="flex-1 min-h-[48px] px-3 rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                     :class="bidButtonClass('misere')"
                     @click="selectBid(null, null, 'misere')"
                 >
@@ -60,7 +60,7 @@
                 </button>
                 <button
                     v-if="openMisereEnabled"
-                    class="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors"
+                    class="flex-1 min-h-[48px] px-3 rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                     :class="bidButtonClass('open_misere')"
                     @click="selectBid(null, null, 'open_misere')"
                 >
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Tricks Won -->
-        <div v-if="selectedBidKey && !isMisereBid" class="mb-4">
+        <div v-if="selectedBidKey && !isMisereBid" class="mb-5">
             <label class="block text-sm font-medium mb-2">Tricks Won by Bidding Team</label>
             <div class="flex items-center gap-4">
                 <InputNumber
@@ -92,21 +92,21 @@
         </div>
 
         <!-- Misère tricks (0 or not) -->
-        <div v-if="selectedBidKey && isMisereBid" class="mb-4">
+        <div v-if="selectedBidKey && isMisereBid" class="mb-5">
             <label class="block text-sm font-medium mb-2">Did the bidder take any tricks?</label>
-            <div class="flex gap-2">
+            <div class="flex gap-3">
                 <Button
                     label="No tricks (success)"
                     :severity="bidderTricksWon === 0 ? 'success' : 'secondary'"
                     :outlined="bidderTricksWon !== 0"
-                    class="flex-1"
+                    class="flex-1 !min-h-[48px] !text-base"
                     @click="bidderTricksWon = 0"
                 />
                 <Button
                     label="Took tricks (failed)"
                     :severity="bidderTricksWon !== null && bidderTricksWon > 0 ? 'danger' : 'secondary'"
                     :outlined="bidderTricksWon === null || bidderTricksWon === 0"
-                    class="flex-1"
+                    class="flex-1 !min-h-[48px] !text-base"
                     @click="bidderTricksWon = 1"
                 />
             </div>
@@ -315,6 +315,21 @@ watch(selectedBidKey, () => {
 
 <style scoped>
 .five-hundred-round-entry table {
-    border-spacing: 2px;
+    border-spacing: 4px;
+}
+
+/* Touch-friendly bid grid cells — min 44px tap targets */
+.bid-cell {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 640px) {
+    .bid-cell {
+        min-height: 48px;
+    }
 }
 </style>

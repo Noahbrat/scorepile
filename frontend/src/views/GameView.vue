@@ -38,6 +38,7 @@
                         label="Add Round"
                         icon="pi pi-plus"
                         severity="info"
+                        class="!min-h-[44px]"
                         @click="addRound"
                         :loading="addingRound"
                     />
@@ -46,6 +47,7 @@
                             label="New Round"
                             icon="pi pi-plus"
                             severity="info"
+                            class="!min-h-[44px]"
                             @click="openBidDialog"
                         />
                     </template>
@@ -54,6 +56,7 @@
                             label="Enter Score"
                             icon="pi pi-pencil"
                             severity="warn"
+                            class="!min-h-[44px]"
                             @click="openScoreDialog"
                         />
                     </template>
@@ -61,6 +64,7 @@
                         label="Complete"
                         icon="pi pi-check"
                         severity="success"
+                        class="!min-h-[44px]"
                         @click="confirmComplete"
                     />
                 </div>
@@ -242,7 +246,7 @@
                 </div>
 
                 <!-- Split scoreboard table -->
-                <div class="overflow-x-auto -mx-4 sm:mx-0">
+                <div class="scoreboard-wrapper overflow-x-auto -mx-4 sm:mx-0">
                     <table class="w-full border-collapse min-w-0">
                         <thead>
                             <!-- Team name header row -->
@@ -323,8 +327,8 @@
                                 </template>
                             </tr>
                         </tbody>
-                        <tfoot>
-                            <tr class="border-t-2 border-surface-300 dark:border-surface-600">
+                        <tfoot class="sticky-footer">
+                            <tr class="border-t-2 border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900">
                                 <td class="p-2"></td>
                                 <template v-for="team in teamInfo" :key="team.number">
                                     <td
@@ -435,7 +439,7 @@
             v-model:visible="completeDialogVisible"
             header="Complete Game"
             :modal="true"
-            :style="{ width: '400px' }"
+            :style="{ width: '400px', maxWidth: '95vw' }"
         >
             <p>Mark this game as complete? Final rankings will be calculated.</p>
 
@@ -456,7 +460,7 @@
             v-model:visible="cancelRoundDialogVisible"
             header="Cancel Round"
             :modal="true"
-            :style="{ width: '400px' }"
+            :style="{ width: '400px', maxWidth: '95vw' }"
         >
             <p>Cancel the current round? The bid will be discarded.</p>
 
@@ -477,7 +481,7 @@
             v-model:visible="bidDialogVisible"
             header="New Round — Place Bid"
             :modal="true"
-            :style="{ width: '500px' }"
+            :style="{ width: '500px', maxWidth: '95vw' }"
         >
             <!-- Dealer selector -->
             <div v-if="trackDealer" class="mb-4">
@@ -489,7 +493,7 @@
                         :label="gp.player?.name ?? 'Player'"
                         :severity="currentDealerId === gp.id ? 'primary' : 'secondary'"
                         :outlined="currentDealerId !== gp.id"
-                        size="small"
+                        class="!min-h-[44px]"
                         @click="currentDealerId = gp.id"
                     />
                 </div>
@@ -510,7 +514,7 @@
             v-model:visible="scoreDialogVisible"
             header="Enter Score"
             :modal="true"
-            :style="{ width: '500px' }"
+            :style="{ width: '500px', maxWidth: '95vw' }"
         >
             <FiveHundredScoreEntry
                 v-if="scoringConfig?.engine === 'five_hundred' && activeRound?.round_data"
@@ -528,7 +532,7 @@
             v-model:visible="newRoundDialogVisible"
             header="New Round"
             :modal="true"
-            :style="{ width: '500px' }"
+            :style="{ width: '500px', maxWidth: '95vw' }"
         >
             <!-- Dealer selector -->
             <div v-if="trackDealer" class="mb-4">
@@ -540,7 +544,7 @@
                         :label="gp.player?.name ?? 'Player'"
                         :severity="currentDealerId === gp.id ? 'primary' : 'secondary'"
                         :outlined="currentDealerId !== gp.id"
-                        size="small"
+                        class="!min-h-[44px]"
                         @click="currentDealerId = gp.id"
                     />
                 </div>
@@ -1192,5 +1196,20 @@ onMounted(() => {
 
 table {
     table-layout: auto;
+}
+
+/* Sticky scoreboard footer — totals stay visible when scrolling long games */
+.sticky-footer tr {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Account for mobile bottom nav bar (56px + safe area) */
+@media (max-width: 640px) {
+    .sticky-footer tr {
+        bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
 }
 </style>

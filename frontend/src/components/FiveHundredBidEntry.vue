@@ -1,7 +1,7 @@
 <template>
     <div class="five-hundred-bid-entry">
         <!-- Bidding Player -->
-        <div class="mb-4">
+        <div class="mb-5">
             <label class="block text-sm font-medium mb-2">Who won the bid?</label>
             <div class="flex flex-wrap gap-2">
                 <Button
@@ -10,7 +10,7 @@
                     :label="gp.player?.name ?? `Player ${gp.player_id}`"
                     :severity="selectedBidderId === gp.id ? 'primary' : 'secondary'"
                     :outlined="selectedBidderId !== gp.id"
-                    class="flex-1"
+                    class="flex-1 !min-h-[44px] !text-base"
                     @click="selectBidder(gp)"
                 />
             </div>
@@ -20,26 +20,26 @@
         </div>
 
         <!-- Bid Selection Grid -->
-        <div class="mb-4">
+        <div class="mb-5">
             <label class="block text-sm font-medium mb-2">Bid</label>
 
             <!-- Avondale grid: rows = tricks (6-10), cols = suits -->
-            <div class="overflow-x-auto -mx-2 px-2">
-                <table class="w-full border-collapse text-center text-sm">
+            <div class="bid-grid">
+                <table class="w-full border-collapse text-center">
                     <thead>
                         <tr>
-                            <th class="p-1 text-xs text-muted-color"></th>
+                            <th class="p-1 text-sm text-muted-color"></th>
                             <th v-for="suit in suits" :key="suit.key" class="p-1">
-                                <span :class="suitColorClass(suit.key)">{{ suit.symbol }}</span>
+                                <span class="text-lg" :class="suitColorClass(suit.key)">{{ suit.symbol }}</span>
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="tricks in trickRange" :key="tricks">
-                            <td class="p-1 font-medium text-muted-color">{{ tricks }}</td>
-                            <td v-for="suit in suits" :key="suit.key" class="p-0.5">
+                            <td class="p-1 font-semibold text-muted-color text-sm">{{ tricks }}</td>
+                            <td v-for="suit in suits" :key="suit.key" class="p-1">
                                 <button
-                                    class="w-full py-1.5 px-1 rounded text-xs font-medium transition-colors"
+                                    class="bid-cell w-full rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                                     :class="bidButtonClass(`${tricks}_${suit.key}`)"
                                     @click="selectBid(tricks, suit.key, `${tricks}_${suit.key}`)"
                                 >
@@ -52,10 +52,10 @@
             </div>
 
             <!-- Special bids -->
-            <div class="flex gap-2 mt-2">
+            <div class="flex gap-2 mt-3">
                 <button
                     v-if="misereEnabled"
-                    class="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors"
+                    class="flex-1 min-h-[48px] px-3 rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                     :class="bidButtonClass('misere')"
                     @click="selectBid(null, null, 'misere')"
                 >
@@ -63,7 +63,7 @@
                 </button>
                 <button
                     v-if="openMisereEnabled"
-                    class="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors"
+                    class="flex-1 min-h-[48px] px-3 rounded-lg text-sm font-semibold transition-colors touch-manipulation"
                     :class="bidButtonClass('open_misere')"
                     @click="selectBid(null, null, 'open_misere')"
                 >
@@ -199,6 +199,22 @@ function handleSave() {
 
 <style scoped>
 .five-hundred-bid-entry table {
-    border-spacing: 2px;
+    border-spacing: 4px;
+}
+
+/* Touch-friendly bid grid cells — min 44px tap targets */
+.bid-cell {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Slightly bigger on mobile for easier tapping */
+@media (max-width: 640px) {
+    .bid-cell {
+        min-height: 48px;
+    }
 }
 </style>
