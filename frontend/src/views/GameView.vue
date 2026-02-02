@@ -41,18 +41,64 @@
                         @click="addRound"
                         :loading="addingRound"
                     />
-                    <Button
-                        v-if="hasEngine"
-                        label="New Round"
-                        icon="pi pi-plus"
-                        severity="info"
-                        @click="openNewRoundDialog"
-                    />
+                    <template v-if="hasEngine && !activeRound">
+                        <Button
+                            label="New Round"
+                            icon="pi pi-plus"
+                            severity="info"
+                            @click="openBidDialog"
+                        />
+                    </template>
+                    <template v-if="hasEngine && activeRound">
+                        <Button
+                            label="Enter Score"
+                            icon="pi pi-pencil"
+                            severity="warn"
+                            @click="openScoreDialog"
+                        />
+                    </template>
                     <Button
                         label="Complete"
                         icon="pi pi-check"
                         severity="success"
                         @click="confirmComplete"
+                    />
+                </div>
+            </div>
+
+            <!-- Active Round Banner -->
+            <div
+                v-if="hasEngine && activeRound && game.status === 'active'"
+                class="mb-4 p-3 rounded-lg border-2 border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-between"
+            >
+                <div class="flex items-center gap-3">
+                    <i class="pi pi-play-circle text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                    <div>
+                        <span class="font-semibold">Round {{ activeRound.round_number }}</span>
+                        <span class="text-sm text-muted-color ml-2">
+                            {{ formatBid(activeRound.round_data ?? {}) }}
+                            ({{ bidderTeamLabel(activeRound.round_data ?? {}) }})
+                            —
+                            {{ getBidValue(activeRound.round_data ?? {}) }} pts
+                        </span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <Button
+                        label="Enter Score"
+                        icon="pi pi-pencil"
+                        severity="warn"
+                        size="small"
+                        @click="openScoreDialog"
+                    />
+                    <Button
+                        icon="pi pi-times"
+                        severity="danger"
+                        text
+                        rounded
+                        size="small"
+                        v-tooltip.top="'Cancel Round'"
+                        @click="confirmCancelRound"
                     />
                 </div>
             </div>
@@ -211,7 +257,13 @@
                                 </td>
                                 <td class="p-2 text-center text-sm">
                                     <Tag
-                                        v-if="round.round_data?.bid_made !== undefined"
+                                        v-if="round.status === 'playing'"
+                                        value="In Progress"
+                                        severity="warn"
+                                        class="text-xs"
+                                    />
+                                    <Tag
+                                        v-else-if="round.round_data?.bid_made !== undefined"
                                         :value="round.round_data.bid_made ? 'Made' : 'Failed'"
                                         :severity="round.round_data.bid_made ? 'success' : 'danger'"
                                         class="text-xs"
@@ -222,9 +274,14 @@
                                     :key="team.number"
                                     class="p-2 text-center text-sm font-medium"
                                 >
-                                    <span :class="getRoundTeamScore(round, team.number) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                                        {{ getRoundTeamScore(round, team.number) >= 0 ? '+' : '' }}{{ getRoundTeamScore(round, team.number) }}
-                                    </span>
+                                    <template v-if="round.status === 'completed'">
+                                        <span :class="getRoundTeamScore(round, team.number) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                                            {{ getRoundTeamScore(round, team.number) >= 0 ? '+' : '' }}{{ getRoundTeamScore(round, team.number) }}
+                                        </span>
+                                    </template>
+                                    <template v-else>
+                                        <span class="text-muted-color">—</span>
+                                    </template>
                                 </td>
                             </tr>
                         </tbody>
@@ -349,7 +406,79 @@
             </template>
         </Dialog>
 
-        <!-- New Round Dialog (for engine-based games) -->
+        <!-- Cancel Round Confirmation Dialog -->
+        <Dialog
+            v-model:visible="cancelRoundDialogVisible"
+            header="Cancel Round"
+            :modal="true"
+            :style="{ width: '400px' }"
+        >
+            <p>Cancel the current round? The bid will be discarded.</p>
+
+            <template #footer>
+                <Button label="Keep Playing" severity="secondary" text @click="cancelRoundDialogVisible = false" />
+                <Button
+                    label="Cancel Round"
+                    severity="danger"
+                    icon="pi pi-times"
+                    :loading="cancellingRound"
+                    @click="handleCancelRound"
+                />
+            </template>
+        </Dialog>
+
+        <!-- Bid Entry Dialog (for starting a new round) -->
+        <Dialog
+            v-model:visible="bidDialogVisible"
+            header="New Round — Place Bid"
+            :modal="true"
+            :style="{ width: '500px' }"
+        >
+            <!-- Dealer selector -->
+            <div v-if="trackDealer" class="mb-4">
+                <label class="block text-sm font-medium mb-2">Dealer</label>
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-for="gp in gamePlayers"
+                        :key="gp.id"
+                        :label="gp.player?.name ?? 'Player'"
+                        :severity="currentDealerId === gp.id ? 'primary' : 'secondary'"
+                        :outlined="currentDealerId !== gp.id"
+                        size="small"
+                        @click="currentDealerId = gp.id"
+                    />
+                </div>
+            </div>
+
+            <FiveHundredBidEntry
+                v-if="scoringConfig?.engine === 'five_hundred'"
+                :gamePlayers="gamePlayers"
+                :scoringConfig="scoringConfig"
+                :gameConfig="effectiveGameConfig"
+                :saving="savingRound"
+                @save="handleSaveBid"
+            />
+        </Dialog>
+
+        <!-- Score Entry Dialog (for completing an active round) -->
+        <Dialog
+            v-model:visible="scoreDialogVisible"
+            header="Enter Score"
+            :modal="true"
+            :style="{ width: '500px' }"
+        >
+            <FiveHundredScoreEntry
+                v-if="scoringConfig?.engine === 'five_hundred' && activeRound?.round_data"
+                :gamePlayers="gamePlayers"
+                :scoringConfig="scoringConfig"
+                :gameConfig="effectiveGameConfig"
+                :roundData="activeRound.round_data"
+                :saving="savingRound"
+                @save="handleSaveScore"
+            />
+        </Dialog>
+
+        <!-- Legacy New Round Dialog (full save in one shot, backward compat) -->
         <Dialog
             v-model:visible="newRoundDialogVisible"
             header="New Round"
@@ -394,6 +523,8 @@ import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import Tag from "primevue/tag";
 import FiveHundredRoundEntry from "@/components/FiveHundredRoundEntry.vue";
+import FiveHundredBidEntry from "@/components/FiveHundredBidEntry.vue";
+import FiveHundredScoreEntry from "@/components/FiveHundredScoreEntry.vue";
 import { gamesApi, roundsApi, scoresApi } from "@/services/api";
 import type { Game, GamePlayer, Round, RoundData, ScoringConfig, CalculateRoundResult } from "@/types/api";
 
@@ -411,7 +542,11 @@ const addingRound = ref(false);
 const completing = ref(false);
 const completeDialogVisible = ref(false);
 const newRoundDialogVisible = ref(false);
+const bidDialogVisible = ref(false);
+const scoreDialogVisible = ref(false);
+const cancelRoundDialogVisible = ref(false);
 const savingRound = ref(false);
+const cancellingRound = ref(false);
 const savingTeams = ref(false);
 const editingTeams = ref(false);
 const teamDraft = reactive<Record<number, number>>({});
@@ -458,6 +593,11 @@ const teamsValid = computed(() => {
         if ((counts[i] ?? 0) !== teamSize) return false;
     }
     return true;
+});
+
+// Active round = the round with status='playing'
+const activeRound = computed<Round | null>(() => {
+    return rounds.value.find(r => r.status === "playing") ?? null;
 });
 
 function initTeamDraft() {
@@ -554,8 +694,6 @@ const teamInfo = computed<TeamSummary[]>(() => {
         const num = Number(t);
         const players = teamMap[num];
         const label = players.map(gp => gp.player?.name ?? `Player ${gp.player_id}`).join(" & ");
-        // Calculate total from playerTotals
-        const total = players.reduce((sum, gp) => sum + (playerTotals.value[gp.id] ?? 0), 0);
         // Since team members share same score, use first player's total (avoid double counting)
         const teamTotal = playerTotals.value[players[0]?.id] ?? 0;
 
@@ -581,11 +719,6 @@ function getRoundTeamScore(round: Round, teamNumber: number): number {
 // ── Dealer tracking ──────────────────────────────────────────────
 
 const trackDealer = computed(() => scoringConfig.value?.track_dealer ?? false);
-
-const dealerPlayer = computed(() => {
-    if (!currentDealerId.value) return null;
-    return gamePlayers.value.find(gp => gp.id === currentDealerId.value) ?? null;
-});
 
 /**
  * Determine dealer for the next round:
@@ -644,6 +777,12 @@ function bidderTeamLabel(roundData: RoundData): string {
     if (!roundData.bidder_team) return "";
     const team = teamInfo.value.find(t => t.key === roundData.bidder_team);
     return team?.shortLabel ?? roundData.bidder_team as string;
+}
+
+function getBidValue(roundData: RoundData): number {
+    if (!roundData.bid_key) return 0;
+    const bidTable = (scoringConfig.value?.bid_table ?? {}) as Record<string, number>;
+    return bidTable[roundData.bid_key] ?? 0;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -733,10 +872,108 @@ async function addRound() {
     }
 }
 
-function openNewRoundDialog() {
-    newRoundDialogVisible.value = true;
+function openBidDialog() {
+    bidDialogVisible.value = true;
 }
 
+function openScoreDialog() {
+    scoreDialogVisible.value = true;
+}
+
+function confirmCancelRound() {
+    cancelRoundDialogVisible.value = true;
+}
+
+// Two-step flow: Step 1 — Save bid only (creates round with status='playing')
+async function handleSaveBid(roundData: RoundData) {
+    if (!game.value) return;
+    savingRound.value = true;
+
+    try {
+        const dealerId = trackDealer.value ? currentDealerId.value ?? undefined : undefined;
+        const response = await gamesApi.saveRound(game.value.id, roundData, dealerId);
+        const newRound = response.data.data;
+        rounds.value.push(newRound);
+        bidDialogVisible.value = false;
+
+        toast.add({ severity: "success", summary: "Round Started", detail: `Round ${newRound.round_number} — bid placed`, life: 2000 });
+    } catch (err: unknown) {
+        let msg = "Failed to start round";
+        if (err && typeof err === "object" && "response" in err) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            msg = axiosError.response?.data?.message || msg;
+        }
+        toast.add({ severity: "error", summary: "Error", detail: msg, life: 5000 });
+    } finally {
+        savingRound.value = false;
+    }
+}
+
+// Two-step flow: Step 2 — Complete round with tricks won
+async function handleSaveScore(tricksWon: Record<string, number>, _calculatedScores: CalculateRoundResult | null) {
+    if (!game.value || !activeRound.value) return;
+    savingRound.value = true;
+
+    try {
+        const response = await gamesApi.completeRound(game.value.id, activeRound.value.id, tricksWon);
+        const completedRound = response.data.data;
+
+        // Replace the playing round with the completed one
+        const idx = rounds.value.findIndex(r => r.id === completedRound.id);
+        if (idx >= 0) {
+            rounds.value[idx] = completedRound;
+        }
+        buildScoreMap([completedRound]);
+        scoreDialogVisible.value = false;
+
+        // Advance dealer for next round
+        if (trackDealer.value && currentDealerId.value) {
+            currentDealerId.value = getNextDealer(currentDealerId.value);
+        }
+
+        // Reload game to get updated totals
+        const gameRes = await gamesApi.getById(game.value.id);
+        game.value = gameRes.data.data;
+
+        toast.add({ severity: "success", summary: "Score Saved", detail: `Round ${completedRound.round_number}`, life: 2000 });
+    } catch (err: unknown) {
+        let msg = "Failed to save score";
+        if (err && typeof err === "object" && "response" in err) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            msg = axiosError.response?.data?.message || msg;
+        }
+        toast.add({ severity: "error", summary: "Error", detail: msg, life: 5000 });
+    } finally {
+        savingRound.value = false;
+    }
+}
+
+// Cancel active round
+async function handleCancelRound() {
+    if (!game.value || !activeRound.value) return;
+    cancellingRound.value = true;
+
+    try {
+        await gamesApi.cancelRound(game.value.id, activeRound.value.id);
+
+        // Remove from local list
+        rounds.value = rounds.value.filter(r => r.id !== activeRound.value!.id);
+        cancelRoundDialogVisible.value = false;
+
+        toast.add({ severity: "info", summary: "Round Cancelled", detail: "The round has been discarded", life: 2000 });
+    } catch (err: unknown) {
+        let msg = "Failed to cancel round";
+        if (err && typeof err === "object" && "response" in err) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            msg = axiosError.response?.data?.message || msg;
+        }
+        toast.add({ severity: "error", summary: "Error", detail: msg, life: 5000 });
+    } finally {
+        cancellingRound.value = false;
+    }
+}
+
+// Legacy one-shot save (backward compat, used by FiveHundredRoundEntry)
 async function handleSaveEngineRound(roundData: RoundData, _calculatedScores: CalculateRoundResult | null) {
     if (!game.value) return;
     savingRound.value = true;

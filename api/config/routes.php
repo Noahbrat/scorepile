@@ -119,6 +119,18 @@ return static function (RouteBuilder $routes) {
             'prefix' => 'Api',
         ], ['_method' => ['POST'], 'pass' => ['id']]);
 
+        $routes->connect('/games/{id}/rounds/{roundId}/complete', [
+            'controller' => 'Games',
+            'action' => 'completeRound',
+            'prefix' => 'Api',
+        ], ['_method' => ['POST'], 'pass' => ['id', 'roundId']]);
+
+        $routes->connect('/games/{id}/rounds/{roundId}/cancel', [
+            'controller' => 'Games',
+            'action' => 'cancelRound',
+            'prefix' => 'Api',
+        ], ['_method' => ['DELETE', 'POST'], 'pass' => ['id', 'roundId']]);
+
         $routes->resources('GameTypes', [
             'controller' => 'Api/GameTypes',
         ]);

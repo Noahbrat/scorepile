@@ -524,6 +524,10 @@ class GamesController extends AppController
     /**
      * Save a round with engine-calculated scores in one transaction.
      *
+     * When round_data has bid info but NO tricks_won, creates a round
+     * with status='playing' (bid-only). When both bid and tricks are
+     * present, creates with status='completed' (full save, backward compat).
+     *
      * POST /api/games/:id/save-round.json
      */
     public function saveRound(?string $id = null): void
@@ -544,12 +548,208 @@ class GamesController extends AppController
             return;
         }
 
+        // Check for existing playing round — only one active round allowed
+        $roundsTable = $this->getTableLocator()->get('Rounds');
+        $existingPlaying = $roundsTable->find()
+            ->where(['game_id' => $game->id, 'status' => 'playing'])
+            ->first();
+
+        if ($existingPlaying) {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'A round is already in progress. Complete or cancel it first.',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
         $roundData = $this->request->getData('round_data') ?? [];
         $dealerGamePlayerId = $this->request->getData('dealer_game_player_id');
         $scoringConfig = $game->game_type?->scoring_config;
         $gameConfig = array_merge($scoringConfig ?? [], $game->game_config ?? []);
 
-        // Calculate scores using engine if available
+        // Determine if this is a bid-only save (no tricks_won) or full save
+        $hasTricksWon = !empty($roundData['tricks_won']);
+        $isBidOnly = !empty($roundData['bid_key']) && !$hasTricksWon;
+
+        // Calculate scores using engine if available and tricks are provided
+        $calculatedScores = [];
+        if ($scoringConfig && $hasTricksWon) {
+            $engine = ScoringEngineFactory::forGameType($scoringConfig);
+
+            $validation = $engine->validateRoundData($roundData, $gameConfig);
+            if ($validation !== true) {
+                $this->response = $this->response->withStatus(422);
+                $this->set([
+                    'success' => false,
+                    'message' => 'Invalid round data',
+                    'errors' => $validation,
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+
+                return;
+            }
+
+            $result = $engine->calculateRoundScores($roundData, $gameConfig);
+            $calculatedScores = $result['scores'] ?? [];
+        } elseif ($scoringConfig && $isBidOnly) {
+            // Validate bid-only fields (bidder_team and bid_key required)
+            $errors = [];
+            if (empty($roundData['bidder_team'])) {
+                $errors[] = 'Bidding team is required';
+            }
+            if (empty($roundData['bid_key'])) {
+                $errors[] = 'Bid is required';
+            }
+            if (!empty($errors)) {
+                $this->response = $this->response->withStatus(422);
+                $this->set([
+                    'success' => false,
+                    'message' => 'Invalid round data',
+                    'errors' => $errors,
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+
+                return;
+            }
+        } elseif ($scoringConfig && !$hasTricksWon && !$isBidOnly) {
+            // Engine game but no valid bid or tricks — run full validation to get errors
+            $engine = ScoringEngineFactory::forGameType($scoringConfig);
+            $validation = $engine->validateRoundData($roundData, $gameConfig);
+            if ($validation !== true) {
+                $this->response = $this->response->withStatus(422);
+                $this->set([
+                    'success' => false,
+                    'message' => 'Invalid round data',
+                    'errors' => $validation,
+                ]);
+                $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+
+                return;
+            }
+        }
+
+        $scoresTable = $this->getTableLocator()->get('Scores');
+
+        // Auto-assign round_number
+        $maxRound = $roundsTable->find()
+            ->where(['game_id' => $game->id])
+            ->select(['max_round' => $roundsTable->find()->func()->max('round_number')])
+            ->first();
+        $roundNumber = (int)(($maxRound->max_round ?? 0) + 1);
+
+        $roundStatus = $isBidOnly ? 'playing' : 'completed';
+
+        $roundEntity = $roundsTable->newEntity([
+            'game_id' => $game->id,
+            'round_number' => $roundNumber,
+            'round_data' => $roundData,
+            'dealer_game_player_id' => $dealerGamePlayerId ? (int)$dealerGamePlayerId : null,
+            'status' => $roundStatus,
+        ]);
+
+        if (!$roundsTable->save($roundEntity)) {
+            $this->response = $this->response->withStatus(422);
+            $this->set([
+                'success' => false,
+                'message' => 'Could not save round',
+                'errors' => $roundEntity->getErrors(),
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
+
+            return;
+        }
+
+        // Only save scores for completed rounds
+        if ($roundStatus === 'completed') {
+            $this->saveRoundScores($game, $roundEntity, $calculatedScores, $scoringConfig);
+        }
+
+        // Reload round with scores
+        $roundEntity = $roundsTable->get($roundEntity->id, contain: [
+            'Scores' => ['GamePlayers' => ['Players']],
+        ]);
+
+        $this->response = $this->response->withStatus(201);
+        $this->set([
+            'success' => true,
+            'data' => $roundEntity,
+        ]);
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+    }
+
+    /**
+     * Complete a playing round — add tricks and calculate scores.
+     *
+     * POST /api/games/:id/rounds/:roundId/complete.json
+     */
+    public function completeRound(?string $id = null, ?string $roundId = null): void
+    {
+        $this->request->allowMethod(['post']);
+        $user = $this->requireAuthentication();
+
+        $game = $this->Games->get($id, contain: ['GameTypes', 'GamePlayers']);
+
+        if ($game->user_id !== $user->id) {
+            $this->response = $this->response->withStatus(403);
+            $this->set([
+                'success' => false,
+                'message' => 'Not authorized',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        $roundsTable = $this->getTableLocator()->get('Rounds');
+        $roundEntity = $roundsTable->get((int)$roundId);
+
+        // Validate round belongs to this game
+        if ($roundEntity->game_id !== $game->id) {
+            $this->response = $this->response->withStatus(404);
+            $this->set([
+                'success' => false,
+                'message' => 'Round not found for this game',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        // Validate round is in 'playing' status
+        if ($roundEntity->status !== 'playing') {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'Round is not in playing status',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        $tricksWon = $this->request->getData('tricks_won') ?? [];
+        if (empty($tricksWon) || !is_array($tricksWon)) {
+            $this->response = $this->response->withStatus(422);
+            $this->set([
+                'success' => false,
+                'message' => 'tricks_won is required',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        // Merge tricks into existing round_data
+        $roundData = $roundEntity->round_data ?? [];
+        $roundData['tricks_won'] = $tricksWon;
+
+        $scoringConfig = $game->game_type?->scoring_config;
+        $gameConfig = array_merge($scoringConfig ?? [], $game->game_config ?? []);
+
+        // Calculate scores
         $calculatedScores = [];
         if ($scoringConfig) {
             $engine = ScoringEngineFactory::forGameType($scoringConfig);
@@ -569,31 +769,18 @@ class GamesController extends AppController
 
             $result = $engine->calculateRoundScores($roundData, $gameConfig);
             $calculatedScores = $result['scores'] ?? [];
+            $roundData['bid_made'] = $result['bid_made'] ?? null;
         }
 
-        $roundsTable = $this->getTableLocator()->get('Rounds');
-        $scoresTable = $this->getTableLocator()->get('Scores');
-        $gamePlayersTable = $this->getTableLocator()->get('GamePlayers');
-
-        // Auto-assign round_number
-        $maxRound = $roundsTable->find()
-            ->where(['game_id' => $game->id])
-            ->select(['max_round' => $roundsTable->find()->func()->max('round_number')])
-            ->first();
-        $roundNumber = (int)(($maxRound->max_round ?? 0) + 1);
-
-        $roundEntity = $roundsTable->newEntity([
-            'game_id' => $game->id,
-            'round_number' => $roundNumber,
-            'round_data' => $roundData,
-            'dealer_game_player_id' => $dealerGamePlayerId ? (int)$dealerGamePlayerId : null,
-        ]);
+        // Update round
+        $roundEntity->round_data = $roundData;
+        $roundEntity->status = 'completed';
 
         if (!$roundsTable->save($roundEntity)) {
             $this->response = $this->response->withStatus(422);
             $this->set([
                 'success' => false,
-                'message' => 'Could not save round',
+                'message' => 'Could not update round',
                 'errors' => $roundEntity->getErrors(),
             ]);
             $this->viewBuilder()->setOption('serialize', ['success', 'message', 'errors']);
@@ -601,11 +788,93 @@ class GamesController extends AppController
             return;
         }
 
-        // Save scores per team (map team scores to game_player scores)
+        // Save scores
+        $this->saveRoundScores($game, $roundEntity, $calculatedScores, $scoringConfig);
+
+        // Reload round with scores
+        $roundEntity = $roundsTable->get($roundEntity->id, contain: [
+            'Scores' => ['GamePlayers' => ['Players']],
+        ]);
+
+        $this->set([
+            'success' => true,
+            'data' => $roundEntity,
+        ]);
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+    }
+
+    /**
+     * Cancel a playing round — delete it.
+     *
+     * DELETE /api/games/:id/rounds/:roundId/cancel.json
+     */
+    public function cancelRound(?string $id = null, ?string $roundId = null): void
+    {
+        $this->request->allowMethod(['delete', 'post']);
+        $user = $this->requireAuthentication();
+
+        $game = $this->Games->get($id);
+
+        if ($game->user_id !== $user->id) {
+            $this->response = $this->response->withStatus(403);
+            $this->set([
+                'success' => false,
+                'message' => 'Not authorized',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        $roundsTable = $this->getTableLocator()->get('Rounds');
+        $roundEntity = $roundsTable->get((int)$roundId);
+
+        if ($roundEntity->game_id !== $game->id) {
+            $this->response = $this->response->withStatus(404);
+            $this->set([
+                'success' => false,
+                'message' => 'Round not found for this game',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        if ($roundEntity->status !== 'playing') {
+            $this->response = $this->response->withStatus(400);
+            $this->set([
+                'success' => false,
+                'message' => 'Only playing rounds can be cancelled',
+            ]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+
+            return;
+        }
+
+        if ($roundsTable->delete($roundEntity)) {
+            $this->set([
+                'success' => true,
+                'message' => 'Round cancelled',
+            ]);
+        } else {
+            $this->response = $this->response->withStatus(500);
+            $this->set([
+                'success' => false,
+                'message' => 'Could not cancel round',
+            ]);
+        }
+        $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+    }
+
+    /**
+     * Save calculated scores for a round, mapping team or player scores.
+     */
+    private function saveRoundScores($game, $roundEntity, array $calculatedScores, ?array $scoringConfig): void
+    {
+        $scoresTable = $this->getTableLocator()->get('Scores');
         $teamsEnabled = ($scoringConfig['teams']['enabled'] ?? false);
 
         if ($teamsEnabled && !empty($calculatedScores)) {
-            // Map team scores to individual game players
             foreach ($game->game_players as $gp) {
                 $teamKey = 'team_' . $gp->team;
                 if (isset($calculatedScores[$teamKey])) {
@@ -615,13 +884,10 @@ class GamesController extends AppController
                         'points' => (float)$calculatedScores[$teamKey],
                     ]);
                     $scoresTable->save($score);
-
-                    // Recalculate total
                     $this->recalculateTotal($gp->id);
                 }
             }
         } elseif (!empty($calculatedScores)) {
-            // Direct player scores (non-team mode)
             foreach ($calculatedScores as $gamePlayerId => $points) {
                 $score = $scoresTable->newEntity([
                     'round_id' => $roundEntity->id,
@@ -632,18 +898,6 @@ class GamesController extends AppController
                 $this->recalculateTotal((int)$gamePlayerId);
             }
         }
-
-        // Reload round with scores
-        $roundEntity = $roundsTable->get($roundEntity->id, contain: [
-            'Scores' => ['GamePlayers' => ['Players']],
-        ]);
-
-        $this->response = $this->response->withStatus(201);
-        $this->set([
-            'success' => true,
-            'data' => $roundEntity,
-        ]);
-        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
     }
 
     /**

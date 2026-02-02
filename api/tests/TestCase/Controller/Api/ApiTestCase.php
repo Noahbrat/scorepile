@@ -185,13 +185,19 @@ abstract class ApiTestCase extends TestCase
         return $table->saveOrFail($table->newEntity($data));
     }
 
-    protected function createRound(int $gameId, int $roundNumber = 1): \Cake\Datasource\EntityInterface
+    protected function createRound(int $gameId, int $roundNumber = 1, string $status = 'completed', ?array $roundData = null): \Cake\Datasource\EntityInterface
     {
         $table = TableRegistry::getTableLocator()->get('Rounds');
 
-        return $table->saveOrFail($table->newEntity([
+        $data = [
             'game_id' => $gameId,
             'round_number' => $roundNumber,
-        ]));
+            'status' => $status,
+        ];
+        if ($roundData !== null) {
+            $data['round_data'] = $roundData;
+        }
+
+        return $table->saveOrFail($table->newEntity($data));
     }
 }

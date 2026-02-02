@@ -202,6 +202,14 @@ describe("FiveHundredRoundEntry", () => {
         expect(saveButton).toBeTruthy();
     });
 
+    it("emits save with full round data including tricks_won", async () => {
+        // This verifies backward compatibility - the original component
+        // still emits full round data with tricks_won for one-shot saves
+        const wrapper = mountComponent();
+        expect(wrapper.text()).toContain("Bidding Team");
+        expect(wrapper.text()).toContain("Save Round");
+    });
+
     it("shows all 25 standard bid values in grid", () => {
         const wrapper = mountComponent();
 

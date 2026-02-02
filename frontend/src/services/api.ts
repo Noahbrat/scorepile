@@ -336,6 +336,17 @@ export const gamesApi = {
             `/games/${id}/assign-teams.json`,
             { teams },
         ),
+
+    completeRound: (gameId: number, roundId: number, tricksWon: Record<string, number>) =>
+        api.post<ApiResponse<Round>>(
+            `/games/${gameId}/rounds/${roundId}/complete.json`,
+            { tricks_won: tricksWon },
+        ),
+
+    cancelRound: (gameId: number, roundId: number) =>
+        api.post<ApiResponse<null>>(
+            `/games/${gameId}/rounds/${roundId}/cancel.json`,
+        ),
 };
 
 // =====================================================

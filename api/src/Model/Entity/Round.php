@@ -14,6 +14,7 @@ use Cake\ORM\Entity;
  * @property string|null $name
  * @property int|null $dealer_game_player_id
  * @property array|null $round_data
+ * @property string $status
  * @property \Cake\I18n\DateTime $created
  * @property \Cake\I18n\DateTime $modified
  *
@@ -29,5 +30,6 @@ class Round extends Entity
         'name' => true,
         'dealer_game_player_id' => true,
         'round_data' => true,
+        'status' => true,
     ];
 }
