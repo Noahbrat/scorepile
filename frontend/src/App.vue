@@ -2,13 +2,30 @@
     <div id="app" :class="{ 'app-with-sidebar': showSidebarLayout }">
         <!-- Sidebar layout for authenticated users -->
         <template v-if="showSidebarLayout">
-            <!-- Mobile Header -->
+            <!-- Mobile Header (simplified — no hamburger, just brand) -->
             <header class="mobile-header">
-                <button class="hamburger-btn" @click="toggleSidebar">
-                    <i class="pi pi-bars"></i>
-                </button>
-                <div class="mobile-brand">Scorepile</div>
+                <div class="mobile-brand">🃏 Scorepile</div>
             </header>
+
+            <!-- Mobile Bottom Nav -->
+            <nav class="bottom-nav">
+                <RouterLink to="/" class="bottom-nav-item" exact-active-class="bottom-nav-active">
+                    <i class="pi pi-home"></i>
+                    <span>Home</span>
+                </RouterLink>
+                <RouterLink to="/games" class="bottom-nav-item" active-class="bottom-nav-active">
+                    <i class="pi pi-play"></i>
+                    <span>Games</span>
+                </RouterLink>
+                <RouterLink to="/players" class="bottom-nav-item" active-class="bottom-nav-active">
+                    <i class="pi pi-users"></i>
+                    <span>Players</span>
+                </RouterLink>
+                <RouterLink to="/game-types" class="bottom-nav-item" active-class="bottom-nav-active">
+                    <i class="pi pi-cog"></i>
+                    <span>Settings</span>
+                </RouterLink>
+            </nav>
 
             <!-- Sidebar Navigation -->
             <nav class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
@@ -340,6 +357,43 @@ onMounted(async () => {
     padding: 2rem;
 }
 
+/* Bottom Navigation */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--p-surface-950);
+    border-top: 1px solid var(--p-surface-700);
+    z-index: 1001;
+    justify-content: space-around;
+    align-items: center;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--p-surface-400);
+    text-decoration: none;
+    font-size: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item i {
+    font-size: 1.25rem;
+}
+
+.bottom-nav-active {
+    color: var(--p-primary-color);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     #app.app-with-sidebar {
@@ -348,23 +402,24 @@ onMounted(async () => {
 
     .mobile-header {
         display: flex;
+        justify-content: center;
+    }
+
+    .bottom-nav {
+        display: flex;
     }
 
     .sidebar {
-        transform: translateX(-100%);
-    }
-
-    .sidebar-open {
-        transform: translateX(0);
+        display: none;
     }
 
     .sidebar-overlay {
-        display: block;
+        display: none;
     }
 
     .main-content {
         margin-left: 0;
-        padding: 80px 1rem 2rem 1rem;
+        padding: 68px 1rem 76px 1rem;
     }
 }
 </style>
@@ -416,5 +471,14 @@ html:not(.app-dark) .mobile-header {
 
 html:not(.app-dark) .hamburger-btn {
     color: var(--p-surface-900);
+}
+
+html:not(.app-dark) .bottom-nav {
+    background: var(--p-surface-50);
+    border-top-color: var(--p-surface-300);
+}
+
+html:not(.app-dark) .bottom-nav-item {
+    color: var(--p-surface-500);
 }
 </style>
