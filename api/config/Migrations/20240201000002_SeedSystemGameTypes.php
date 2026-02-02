@@ -33,6 +33,16 @@ class SeedSystemGameTypes extends AbstractMigration
                     'default' => 3,
                 ],
                 [
+                    'key' => 'min_bid',
+                    'label' => 'Minimum Bid',
+                    'type' => 'select',
+                    'choices' => [
+                        ['value' => 6, 'label' => '6 tricks'],
+                        ['value' => 7, 'label' => '7 tricks'],
+                    ],
+                    'default' => 7,
+                ],
+                [
                     'key' => 'misere_enabled',
                     'label' => 'Allow Misère / Nullo',
                     'type' => 'boolean',

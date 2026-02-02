@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Toast />
+        <Toast position="bottom-right" />
 
         <!-- Header -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
